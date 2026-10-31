@@ -1,9 +1,18 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>منصة درجاتي</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Readex+Pro:wght@500;600;700&display=swap">
 <style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+
 /* Layout: a teal header band, then one working sheet — tabs, toolbar, and a dense grade grid with a sticky name column */
 :root{
   --bg:#EEF3F1; --surface:#FFFFFF; --sunk:#F5F8F7; --ink:#12302B; --muted:#5A6F6A; --line:#D5E0DC;
@@ -256,7 +265,8 @@ td.xs{color:var(--gold);font-weight:600}
 @media (min-width:1400px){.wrap{max-width:1400px}}
 .toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:9px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
 </style>
-
+</head>
+<body>
 <div dir="rtl" lang="ar">
 <header class="top"><div class="wrap">
   <div class="brand">
@@ -321,19 +331,19 @@ function saveSession(){try{sessionStorage.setItem("rasd.session",JSON.stringify(
 function restoreSession(){try{S.session=JSON.parse(sessionStorage.getItem("rasd.session")||"null")}catch{}}
 const toEn=t=>String(t||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d));
 async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3200)}
+function toast(m){const t=$("#toast");if(!t)return;t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3200)}
 function setSync(s){S.sync=s;const el=$("#syncTxt");if(el)el.textContent=s==="saving"?"جارٍ الحفظ…":s==="err"?"تعذّر الحفظ":"كل التغييرات محفوظة"}
 
-/* ---------- write queue (one write at a time per student) ---------- */
+/* ---------- write queue ---------- */
 const dirty=new Map(),inflight=new Set();let pumpT=null;
 function merge(a,b){const o={...a};for(const k in b){const v=b[k];o[k]=v&&typeof v==="object"&&!Array.isArray(v)&&a[k]&&typeof a[k]==="object"&&!Array.isArray(a[k])?merge(a[k],v):v}return o}
 function queue(nid,patch){dirty.set(nid,merge(dirty.get(nid)||{},patch));setSync("saving");clearTimeout(pumpT);pumpT=setTimeout(pump,450)}
 function pump(){for(const nid of [...dirty.keys()]){if(inflight.size>=5)break;if(inflight.has(nid))continue;const patch=dirty.get(nid);dirty.delete(nid);inflight.add(nid);
   write(nid,patch).finally(()=>{inflight.delete(nid);if(dirty.size)pump();else if(!inflight.size&&S.sync!=="err")setSync("saved")})}}
-async function write(nid,patch,retry){const ref=S.db.doc("grades/"+nid);
+async function write(nid,patch,retry){if(!S.db)return;const ref=S.db.doc("grades/"+nid);
   try{if(S.remote.has(nid))await ref.update(patch);else{await ref.set({...JSON.parse(JSON.stringify(G(nid))),nid});S.remote.add(nid)}}
   catch(e){if(e&&e.code==="unavailable"&&!retry){await new Promise(r=>setTimeout(r,600+Math.random()*600));return write(nid,patch,true)}
-    setSync("err");toast(e&&e.code==="invalid_argument"?"لم يُحفظ الرصد: حسابك على المنصة لا يملك صلاحية رصد الدرجات. اطلب من المالك منحك صلاحية «محرر».":"تعذّر حفظ الدرجات، حاول مرة أخرى.")}}
+    setSync("err");toast("تعذّر حفظ الدرجات، حاول مرة أخرى.")}}
 function editG(nid,fn){const g=JSON.parse(JSON.stringify(G(nid)));fn(g);S.grades.set(nid,g)}
 function setCell(nid,k,a,i,v){
   if(k==="w")editG(nid,g=>{g.w=g.w||{};const arr=(g.w[a]||Array(10).fill(null)).slice();while(arr.length<10)arr.push(null);arr[i]=v;g.w[a]=arr;queue(nid,{w:{[a]:arr}})});
@@ -344,570 +354,22 @@ function setCell(nid,k,a,i,v){
 
 /* ---------- boot ---------- */
 async function boot(){
-  restoreSession();render();
-  if(!window.claude||!claude.use){S.noDb=true;render();return}
-  const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
-  S.db=db;S.user=user;
-  if(!db){S.noDb=true;render();return}
-  try{S.canEdit=user?!!(await user.canEdit()):false}catch{}
-  try{S.uid=user?await user.id():null}catch{}
-  const fail=()=>{};
-  db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():null;$("#school").textContent=cfg().school+(cfg().subject?" · "+cfg().subject:"");render()},fail);
-  db.collection("students").onSnapshot(q=>{S.students=new Map(q.docs.map(d=>[d.id,d.data()]));S.loaded=true;render()},fail);
-  db.collection("grades").onSnapshot(q=>{S.remote=new Set(q.docs.map(d=>d.id));
-    for(const d of q.docs){if(!dirty.has(d.id)&&!inflight.has(d.id))S.grades.set(d.id,d.data())}
-    for(const id of [...S.grades.keys()])if(!S.remote.has(id)&&!dirty.has(id)&&!inflight.has(id))S.grades.delete(id);
-    if(S.session&&S.session.role==="t"&&["weekly","exams","extras","summary","final"].includes(S.tab))refreshValues();else render()},fail);
-  db.doc("data/staff/meta/lock").onSnapshot(s=>{S.lock=s.exists?s.data().hash:null;S.lockLoaded=true;if(S.tab==="ids")render()},fail);
-  if(S.canEdit){
-    db.collection("data/staff/teachers").onSnapshot(q=>{S.teachers=q.docs.map(d=>({u:d.id,...d.data()}));S.teachersEmpty=q.empty;
-      if(!S.session||S.tab==="settings")render()},fail);
-  }
-  if(S.session&&S.session.role==="s")startStudentInbox();
-  if(S.session&&S.session.role==="t")startTeacherInbox();
+  restoreSession();
   render();
 }
 
-/* ---------- messages ---------- */
-const fmtTime=t=>{try{return new Date(t).toLocaleString("ar-SA-u-nu-latn",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}catch{return ""}};
-const fmtSize=b=>b>1048576?(b/1048576).toFixed(1)+" م.ب":Math.max(1,Math.round(b/1024))+" ك.ب";
-function startTeacherInbox(){if(!S.db||S.tInbox)return;S.tInbox=true;
-  S.db.collection("inbox").onSnapshot(q=>{S.inbox=new Map(q.docs.map(d=>[d.id,d.data()]));updateMsgBadge();if(S.tab==="messages")renderThreads()},()=>{})}
-async function startStudentInbox(){if(!S.db||S.stInbox)return;S.stInbox=true;
-  if(!S.uid){S.msgOk=false;S.msgWhy="signin";render();return}
-  const nid=S.session.id,ref=S.db.doc("inbox/"+S.uid);
-  try{const snap=await ref.get();const st=(await S.db.doc("students/"+nid).get()).data()||{};const old=snap.exists?snap.data():{};
-    if(!snap.exists)await ref.set({nid,name:st.name||"",cls:st.cls||"",lastAt:null,lastFrom:null,lastText:"",tSeen:null,sSeen:null});
-    else if(old.nid!==nid||old.name!==st.name)await ref.update({nid,name:st.name||"",cls:st.cls||""});
-    S.msgOk=true}catch(e){S.msgOk=false;S.msgWhy="perm"}
-  ref.onSnapshot(s=>{S.myThread=s.exists?s.data():null;if(!S.msgOpen&&S.session&&S.session.role==="s")render()},()=>{});
-  subMsgs(S.uid);render()}
-function subMsgs(uid){if(S.unsubMsgs)S.unsubMsgs();S.msgs=[];S.msgsFor=uid;
-  S.unsubMsgs=S.db.collection("inbox/"+uid+"/msgs").orderBy("at").limit(500).onSnapshot(q=>{S.msgs=q.docs.map(d=>({id:d.id,...d.data()}));renderMsgs()},()=>{})}
-function threadNid(){return S.session.role==="t"?((S.inbox.get(S.thread)||{}).nid):S.session.id}
-function unreadThreads(){let n=0;for(const t of S.inbox.values())if(t.lastFrom==="s"&&(!t.tSeen||t.lastAt>t.tSeen))n++;return n}
-function updateMsgBadge(){const b=$("#msgBadge");if(!b)return;const n=unreadThreads();b.textContent=n;b.hidden=!n}
-function fileHTML(f){if(!f)return "";const src=f.id?"/_blob/"+f.id:(f.data||"");if(!src)return "";
-  if(/^image\//.test(f.type||""))return `<a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="${esc(f.name||"صورة")}" loading="lazy"></a>`;
-  return `<a class="mfile" href="${esc(src)}" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>${esc(f.name||"ملف")} · ${fmtSize(f.size||0)}</a>`}
-function renderMsgs(){const box=$("#msgList");if(!box)return;const me=S.session.role==="t"?"t":"s";const nid=threadNid();
-  const list=S.msgs.filter(m=>!m.nid||m.nid===nid);
-  box.innerHTML=list.length?list.map(m=>`<div class="bub${m.from===me?" me":""}">${m.text?esc(m.text):""}${fileHTML(m.file)}<small>${m.from==="t"?esc(m.by||"المعلم"):"الطالب"} · ${fmtTime(m.at)}</small></div>`).join("")
-    :`<div class="empty" style="margin:auto">${me==="t"?"لا توجد رسائل مع هذا الطالب بعد. اكتب أول رسالة بالأسفل.":"لا توجد رسائل بعد. يمكنك مراسلة معلمك من هنا."}</div>`;
-  box.scrollTop=box.scrollHeight;
-  const last=[...list].reverse().find(m=>m.from!==me);const uid=me==="t"?S.thread:S.uid;const th=me==="t"?S.inbox.get(uid):S.myThread;const key=me==="t"?"tSeen":"sSeen";
-  if(last&&uid&&th&&(!th[key]||th[key]<last.at)&&S.seenW!==uid+last.at){S.seenW=uid+last.at;S.db.doc("inbox/"+uid).update({[key]:last.at}).catch(()=>{})}}
-function renderThreads(){const box=$("#thList");if(!box)return;const q=(S.mq||"").trim();
-  const arr=[...S.inbox.entries()].filter(([,t])=>!q||String(t.name).includes(q)).sort((a,b)=>String(b[1].lastAt||"").localeCompare(String(a[1].lastAt||""))||String(a[1].name).localeCompare(String(b[1].name),"ar"));
-  box.innerHTML=arr.length?arr.map(([uid,t])=>{const nw=t.lastFrom==="s"&&(!t.tSeen||t.lastAt>t.tSeen);
-    return `<li><button data-act="thread" data-u="${esc(uid)}" aria-current="${S.thread===uid}"><span class="tn"><span>${esc(t.name||"طالب")}</span>${nw?`<span class="newdot">جديد</span>`:""}</span><span class="tl">${esc(t.cls?"الفصل "+t.cls+" · ":"")}${esc(t.lastText||"لا رسائل")}</span></button></li>`}).join("")
-    :`<li class="muted" style="padding:10px;font-size:13px">لا يظهر هنا إلا الطلاب الذين دخلوا المنصة مرة واحدة على الأقل.</li>`;
-  updateMsgBadge()}
-function composerHTML(){return `<div class="composer"><textarea class="input" id="mText" placeholder="اكتب رسالتك…">${esc(S.draft)}</textarea>
-  <div class="crow"><label class="btn" for="mFile" style="cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7-7l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>إرفاق ملف</label>
-  <input type="file" id="mFile" hidden><span id="fChip"></span><span style="flex:1"></span><button class="btn primary" data-act="send" id="sendBtn">إرسال</button></div></div>`}
-function renderFileChip(){const c=$("#fChip");if(!c)return;c.innerHTML=S.pfile?`<span class="fchip">${esc(S.pfile.name)} · ${fmtSize(S.pfile.size)}<button class="btn sm" data-act="unfile" aria-label="إزالة المرفق">×</button></span>`:""}
-function readDataURL(b){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(b)})}
-async function shrinkImage(file){const url=URL.createObjectURL(file);try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});
-  for(const [m,qq] of [[1400,.72],[1000,.6],[720,.5]]){const k=Math.min(1,m/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
-    c.getContext("2d").drawImage(img,0,0,c.width,c.height);const d=c.toDataURL("image/jpeg",qq);if(d.length<240000)return d}return null}finally{URL.revokeObjectURL(url)}}
-async function uploadFile(file){if(file.size>20*1048576)throw new Error("!حجم الملف أكبر من 20 ميجابايت.");
-  let assets=null;try{assets=await claude.use("assets")}catch{}
-  if(assets){try{const r=await assets.upload(file);return {id:r.id,name:file.name,type:r.contentType||file.type,size:file.size}}catch(e){}}
-  if(/^image\/(png|jpe?g|webp|gif)$/.test(file.type)){const d=await shrinkImage(file);if(d)return {name:file.name,type:"image/jpeg",size:Math.round(d.length*.75),data:d}}
-  if(file.size<=170*1024)return {name:file.name,type:file.type||"application/octet-stream",size:file.size,data:await readDataURL(file)};
-  throw new Error("!تعذّر رفع هذا الملف. أرسل صورة، أو ملفًا أصغر من 170 كيلوبايت.")}
-async function sendMsg(){if(S.sending)return;const text=($("#mText")?.value||"").trim();const file=S.pfile;if(!text&&!file)return;
-  const me=S.session.role==="t"?"t":"s";const uid=me==="t"?S.thread:S.uid;if(!uid)return;const nid=threadNid();
-  S.sending=true;const btn=$("#sendBtn");if(btn){btn.disabled=true;btn.textContent="جارٍ الإرسال…"}
-  try{const f=file?await uploadFile(file):null;const at=new Date().toISOString();
-    await S.db.collection("inbox/"+uid+"/msgs").add({from:me,nid,text,file:f,at,by:me==="t"?S.session.name:""});
-    await S.db.doc("inbox/"+uid).update({lastAt:at,lastFrom:me,lastText:(text||("مرفق: "+file.name)).slice(0,80),[me==="t"?"tSeen":"sSeen"]:at}).catch(()=>{});
-    S.draft="";if($("#mText"))$("#mText").value="";S.pfile=null;renderFileChip()}
-  catch(e){toast(e&&e.message&&e.message[0]==="!"?e.message.slice(1):"تعذّر إرسال الرسالة. تأكد أن حسابك على المنصة يملك صلاحية «مساهم».")}
-  S.sending=false;if(btn){btn.disabled=false;btn.textContent="إرسال"}}
-function messagesTab(){if(S.thread&&!S.inbox.has(S.thread))S.thread=null;
-  const t=S.thread&&S.inbox.get(S.thread);
-  return `<div class="msgwrap"><div class="card stack"><h3>المحادثات</h3><input class="input" id="mq" placeholder="بحث باسم الطالب" value="${esc(S.mq||"")}"><ul class="threads" id="thList"></ul></div>
-  <div class="card convo">${t?`<div><h3>${esc(t.name)}</h3><div class="muted" style="font-size:13px">${t.cls?"الفصل "+esc(t.cls):""}</div></div><div class="msglist" id="msgList"></div>${composerHTML()}`
-    :`<div class="empty"><h3>اختر طالبًا</h3><p>اختر محادثة من القائمة لعرض الرسائل والرد بنص أو ملف.</p></div>`}</div></div>`}
-function studentMsgCard(){const th=S.myThread;const unread=!!(th&&th.lastFrom==="t"&&(!th.sSeen||th.lastAt>th.sSeen));
-  const icon=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>`;
-  if(!S.msgOpen)return `<button class="msgtile" data-act="msgopen"><span class="mi">${icon}</span><span class="mt"><b>الرسائل مع المعلم</b><small>${unread?"لديك رسالة جديدة من معلمك":"اضغط لكتابة رسالة أو إرسال ملف لمعلمك"}</small></span>${unread?`<span class="newdot">جديد</span>`:""}<span class="chev" aria-hidden="true">‹</span></button>`;
-  const head=`<div class="mh"><h3>الرسائل مع المعلم</h3><button class="btn sm" data-act="msgclose">إغلاق</button></div>`;
-  if(S.msgOk===false)return `<div class="card msgbox">${head}<p class="muted" style="margin:6px 0 0">${S.msgWhy==="signin"?"سجّل الدخول إلى حسابك في Claude لتتمكن من مراسلة معلمك.":"لا يملك حسابك صلاحية المراسلة بعد. اطلب من معلمك منحك صلاحية «مساهم» على المنصة."}</p></div>`;
-  return `<div class="card convo msgbox">${head}<div class="msglist" id="msgList"></div>${composerHTML()}</div>`}
+function render(){
+  const v=$("#view");
+  if(!v)return;
+  v.innerHTML=`
+    <div class="card">
+      <h2>مرحباً بك في منصة درجاتي</h2>
+      <p class="muted">المنصة تعمل الآن بشكل أوفلاين ومباشر وتستعرض درجات الطلاب للجميع.</p>
+    </div>
+  `;
+}
 
-/* ---------- header ---------- */
-function renderWho(){const w=$("#who");const s=S.session;
-  if(!s){w.innerHTML="";w.dataset.h="";return}
-  const h=(s.role==="t"?`<span class="sync" id="syncTxt"></span>`:"")+
-    `<span>${esc(s.role==="t"?"المعلم: "+s.name:"الطالب")}</span><button class="btn sm ghost-on-accent" data-act="logout">تسجيل الخروج</button>`;
-  if(w.dataset.h!==h){w.innerHTML=h;w.dataset.h=h}
-  setSync(S.sync||"saved")}
-
-/* ---------- views ---------- */
-function render(){renderWho();const v=$("#view");const s=S.session;
-  const focusId=document.activeElement&&document.activeElement.id;
-  const html=!s?loginView():s.role==="s"?studentView():teacherView();
-  if(html!==S.lastHTML){
-    const keep=$$(".scroll").map(e=>[e.scrollLeft,e.scrollTop]);const vals={};$$("#view input:not(.cell),#view textarea,#view select").forEach(e=>{if(e.id&&e.type!=="file")vals[e.id]=e.value});
-    v.innerHTML=html;S.lastHTML=html;
-    $$(".scroll").forEach((e,i)=>{if(keep[i]){e.scrollLeft=keep[i][0];e.scrollTop=keep[i][1]}});
-    for(const id in vals){const e=document.getElementById(id);if(e&&e.type!=="file"&&!e.value&&vals[id])e.value=vals[id]}
-    if(focusId){const el=document.getElementById(focusId);if(el)el.focus({preventScroll:true})}}
-  if(s&&s.role==="t"){applyFilter();refreshValues();updateMsgBadge();if(S.tab==="messages"){renderThreads();if(S.thread&&S.msgsFor!==S.thread)subMsgs(S.thread);renderMsgs()}}
-  if(s&&s.role==="s")renderMsgs();
-  renderFileChip();freezeNames()}
-
-function loginView(){
-  if(S.noDb)return `<div class="card login"><h2>المنصة تحتاج تسجيل الدخول</h2><p class="muted">افتح هذه الصفحة وأنت مسجّل الدخول إلى حسابك في Claude حتى تظهر بيانات الطلاب والدرجات.</p></div>`;
-  const m=S.loginMode;
-  const setup=m==="t"&&S.canEdit&&S.teachersEmpty;
-  return `<div class="login">
-  <div class="card stack">
-    <div><h2>الدخول إلى درجاتي</h2><p class="muted" style="margin:0">الطالب يدخل برقم الهوية، والمعلم باسم المستخدم وكلمة المرور.</p></div>
-    <div class="seg" role="group"><button data-act="mode" data-m="s" aria-pressed="${m==="s"}">دخول الطالب</button><button data-act="mode" data-m="t" aria-pressed="${m==="t"||m==="r"}">دخول المعلم</button></div>
-    ${m==="s"?`<form class="stack" id="fS">
-      <div class="field"><label for="nid">رقم الهوية</label><input class="input" id="nid" inputmode="numeric" autocomplete="off" placeholder="10 أرقام" maxlength="10"></div>
-      <div class="err" id="eS"></div><button class="btn primary" type="submit">عرض درجاتي</button></form>`
-    :m==="r"?`<form class="stack" id="fReset" autocomplete="off"><p class="hint" style="margin:0">تعذّر الدخول ثلاث مرات. للتحقق أدخل رقم هويتك، ثم اختر كلمة مرور جديدة.</p>
-      <div class="field"><label for="ru">رقم الهوية</label><input class="input" id="ru" dir="ltr" inputmode="numeric" maxlength="10" autocomplete="off"></div>
-      <div class="field"><label for="rp">كلمة المرور الجديدة</label><input class="input" id="rp" type="password" dir="ltr" autocomplete="new-password"></div>
-      <div class="field"><label for="rp2">تأكيد كلمة المرور</label><input class="input" id="rp2" type="password" dir="ltr" autocomplete="new-password"></div>
-      <div class="err" id="eR"></div><button class="btn primary" type="submit">حفظ والدخول</button><button type="button" class="btn sm" data-act="mode" data-m="t" style="justify-self:start">رجوع لتسجيل الدخول</button></form>`
-    :setup?`<form class="stack" id="fSetup"><p class="hint" style="margin:0">لا يوجد حساب معلم بعد. أنشئ الحساب الأول، ويمكنك إضافة بقية المعلمين لاحقًا من الإعدادات.</p>
-      <div class="field"><label for="su_n">اسم المعلم</label><input class="input" id="su_n" required></div>
-      <div class="field"><label for="su_u">اسم المستخدم (أحرف إنجليزية أو أرقام)</label><input class="input" id="su_u" dir="ltr" required></div>
-      <div class="field"><label for="su_p">كلمة المرور</label><input class="input" id="su_p" type="password" dir="ltr" required minlength="6"></div>
-      <div class="err" id="eSetup"></div><button class="btn primary" type="submit">إنشاء الحساب والدخول</button></form>`
-    :`<form class="stack" id="fT">
-      <div class="field"><label for="tu">اسم المستخدم</label><input class="input" id="tu" dir="ltr" autocomplete="username"></div>
-      <div class="field"><label for="tp">كلمة المرور</label><input class="input" id="tp" type="password" dir="ltr" autocomplete="current-password"></div>
-      <div class="err" id="eT"></div><button class="btn primary" type="submit">دخول</button>
-</form>`}
-  </div>
-  </div>`}
-
-function studentView(){const nid=S.session.id;const st=S.students.get(nid);
-  if(!S.loaded)return `<div class="card empty">جارٍ تحميل البيانات…</div>`;
-  if(!st)return `<div class="card empty"><h3>لم يُعثر على الطالب</h3><p>رقم الهوية غير مسجّل حاليًا. راجع معلمك.</p></div>`;
-  const g=G(nid);const c=cfg();
-  return `<section class="st-hero"><div class="hello">مرحبًا، ${esc(String(st.name).split(" ")[0])}</div><h2>${esc(st.name)}</h2>
-    <div class="meta">${st.cls?"الفصل "+esc(st.cls)+" · ":""}${esc(c.school)}${c.subject?" · "+esc(c.subject):""}</div></section>
-    ${studentMsgCard()}
-    ${["p1","p2"].map(p=>isOpenP(p)?periodCard(g,p):closedCard(p)).join("")}`}
-const LOCK=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
-function closedCard(p){const ws=weeksOf(p);return `<div class="closed">${LOCK}<div><h3>${PN[p]}</h3><div style="font-size:13px">الأسابيع ${ws[0]}–${ws[ws.length-1]} · لم يُتحها المعلم بعد</div></div></div>`}
-function ring(v){const r=52,C=2*Math.PI*r,k=Math.max(0,Math.min(1,(v||0)/100));
-  return `<svg class="ring" viewBox="0 0 128 128" width="132" height="132" role="img" aria-label="${fmt(v)} من 100"><circle cx="64" cy="64" r="${r}" fill="none" stroke="var(--ring-bg)" stroke-width="12"/>
-  <circle cx="64" cy="64" r="${r}" fill="none" stroke="var(--accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(C*k).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 64 64)"/>
-  <text x="64" y="60" text-anchor="middle" dominant-baseline="central" class="rv">${fmt(r2(v||0))}</text><text x="64" y="88" text-anchor="middle" class="rl">من 100</text></svg>`}
-function bar(l,v,m){const k=v==null?0:Math.max(0,Math.min(100,v/m*100));return `<div><div class="bl"><span>${l}</span><b>${v==null?"—":fmt(v)} <small>/ ${m}</small></b></div><div class="track"><i style="width:${k}%"></i></div></div>`}
-function pips(v){return `<span class="pips">${[0,1].map(k=>{const f=v==null?0:Math.max(0,Math.min(1,v-k));return `<i class="${f>=1?"full":f>0?"half":""}"></i>`}).join("")}</span>`}
-function periodCard(g,p){const ws=weeksOf(p),vw=visWeeks(p),xs=cfg().extras;const t=rnd(sTasks(g,p)),tot=rnd(t+examsSum(g,p)),xt=sXsum(g,p);
-  const sel=vw.includes(S.stWeek)?S.stWeek:null;
-  return `<section class="pc"><div class="pc-h"><h2>${PN[p]}</h2><span class="muted" style="font-size:13px">الأسابيع ${ws[0]}–${ws[ws.length-1]}</span></div>
-  <div class="pc-b">${ring(tot)}
-    <div class="bars">${bar("المهام الأدائية",r2(t),40)}${EXAMS.map((e,i)=>bar(e.l,exam(g,p,i),e.m)).join("")}
-      ${tasksImported(g,p)?`<div class="hint" style="margin:0">درجة المهام منقولة من السجل السابق.</div>`:""}</div>
-    <div class="medal"><div class="mtop"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.1 6.6.8-4.9 4.6 1.3 6.5L12 16.8 6.1 20l1.3-6.5L2.5 8.9l6.6-.8z"/></svg><div><b>+${fmt(xt)}</b><div style="font-size:12px">درجات استثنائية</div></div></div>
-      <div class="chips">${xs.map(x=>{const v=sX(g,p,x.k);return v?`<span>${esc(x.label)} ${fmt(v)}</span>`:""}).join("")||`<span>لا توجد بعد</span>`}</div>
-      <div style="font-size:11px;opacity:.8">لا تدخل في المجموع من 100</div></div></div>
-  <div class="pc-w"><h3>الأسابيع${vw.length?" · اضغط أي أسبوع لعرض تفاصيله":""}</h3><div class="weekgrid">${ws.map(w=>{if(!isOpenW(w))return `<div class="wk locked" title="لم يُتح بعد"><small>أسبوع ${w}</small>${LOCK}</div>`;
-      const v=weekTotal(g,w);const fl=behList(g,"w"+w).length;
-      return `<button class="wk${v===20?" full":""}${fl?" flag":""}" data-act="stweek" data-w="${w}" aria-pressed="${sel===w}"><small>أسبوع ${w}</small><b>${v==null?"—":fmt(v)}</b><span class="wf"><i style="width:${v==null?0:v/20*100}%"></i></span></button>`}).join("")}</div>
-    ${sel?weekDetail(g,sel):""}</div></section>`}
-function weekDetail(g,w){const a=weekArr(g,w);const beh=behList(g,"w"+w);const xs=cfg().extras.filter(t=>xwk(g,w,t.k));
-  return `<div class="wdetail"><div class="wd-h"><h3>الأسبوع ${w}</h3><b>${fmt(weekTotal(g,w))} <span class="muted" style="font-size:13px">/ 20</span></b></div>
-  <div class="sess2">${[0,1].map(si=>`<div class="sess"><div class="sn">${si?"الحصة الثانية":"الحصة الأولى"}</div>${CRIT.map((c,i)=>{const v=num(a[si*5+i]);return `<div class="critrow"><span>${c}</span>${pips(v)}<b>${v==null?"—":fmt(v)}</b></div>`}).join("")}</div>`).join("")}</div>
-  ${xs.length?`<div class="medal" style="padding:10px 12px"><div class="chips">${xs.map(t=>`<span>${esc(t.label)} +${fmt(xwk(g,w,t.k))}</span>`).join("")}</div></div>`:""}
-  ${beh.length?`<ul class="behlog">${beh.map(x=>`<li><span>${x.s?"الحصة الثانية":"الحصة الأولى"} · ${esc(BEH[x.t]||x.t)}</span><span>−${DED}</span></li>`).join("")}</ul>`:""}</div>`}
-
-function teacherView(){const T=[["weekly","سجل المتابعة"],["exams","التقييمات"],["extras","الدرجات الاستثنائية"],["summary","السجل التجميعي"],["final","الكشف النهائي"],["students","الطلاب"],["ids","سجل الهويات"],["messages","الرسائل"],["settings","الإعدادات"]];
-  let body="";
-  if(["weekly","exams","extras","summary","final"].includes(S.tab))body=S.students.size?gradeTab():noStudents();
-  else if(S.tab==="students")body=studentsTab();else if(S.tab==="ids")body=idsTab();else if(S.tab==="messages")body=messagesTab();else body=settingsTab();
-  return `<nav class="tabs" role="tablist">${T.map(([k,l])=>`<button role="tab" data-act="tab" data-t="${k}" aria-selected="${S.tab===k}">${l}${k==="messages"?`<span class="newdot" id="msgBadge" hidden></span>`:""}</button>`).join("")}</nav>${body}`}
-
-function noStudents(){return `<div class="card empty"><h3>لا يوجد طلاب بعد</h3><p>أضف الطلاب بأسمائهم وأرقام هوياتهم من تبويب «الطلاب»، ثم ارجع هنا للرصد.</p><button class="btn primary" data-act="tab" data-t="students">إضافة الطلاب</button></div>`}
-
-function sortedStudents(){return [...S.students.entries()].map(([nid,s])=>({nid,...s})).sort((a,b)=>String(a.cls||"").localeCompare(String(b.cls||""),"ar",{numeric:true})||String(a.name).localeCompare(String(b.name),"ar"))}
-function classes(){return [...new Set([...S.students.values()].map(s=>s.cls).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"ar",{numeric:true}))}
-
-function toolbar(){const p=S.period;const c=cfg();
-  return `<div class="toolbar"><div class="seg" role="group">${["p1","p2"].map(k=>`<button data-act="period" data-p="${k}" aria-pressed="${p===k}">${PN[k]} · ${c[k].from}–${c[k].to}</button>`).join("")}</div>
-  ${classes().length?`<select class="input" id="clsSel" aria-label="الفصل"><option value="">كل الفصول</option>${classes().map(x=>`<option ${S.cls===x?"selected":""}>${esc(x)}</option>`).join("")}</select>`:""}
-  <input class="input" id="q" placeholder="بحث بالاسم" value="${esc(S.q)}" style="flex:1;min-width:160px">
-  <button class="btn" data-act="print"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg>طباعة التقرير</button></div>`}
-
-function nameCell(s,i){return `<td class="name"><span class="idx">${i+1}</span>${esc(s.name)}${s.cls?`<small>الفصل ${esc(s.cls)}</small>`:""}</td>`}
-function cell(nid,k,a,i,max,wide){return `<input class="cell${wide?" wide":""}" id="c-${nid}-${k}-${a}-${i}" data-nid="${nid}" data-k="${k}" data-a="${a}" data-i="${i}" data-max="${max}" inputmode="decimal" autocomplete="off" aria-label="درجة">`}
-function fillBtn(k,a,i,max,label,gold){return `<button class="fill${gold?" gold":""}" data-act="fill" data-k="${k}" data-a="${a}" data-i="${i}" data-max="${max}" data-label="${esc(label)}" title="رصد العمود كاملًا">${max}</button>`}
-
-function weekChips(ws,st,has){return `<div class="weeks">${ws.map(x=>`<button data-act="week" data-w="${x}" aria-pressed="${x===S.week}" class="${st.some(s=>has(G(s.nid),x))?"done":""}${isOpenW(x)?" pub":""}" title="${isOpenW(x)?"متاح للطلاب":"مغلق عن الطلاب"}">${x}</button>`).join("")}</div>
-  <div class="pubrow"><span>الأسبوع ${S.week}:</span>${isOpenW(S.week)?`<span class="state on">متاح للطلاب</span><button class="btn sm" data-act="togW" data-w="${S.week}">إغلاقه عن الطلاب</button>`:`<span class="state off">مغلق عن الطلاب</span><button class="btn sm primary" data-act="togW" data-w="${S.week}">إتاحته للطلاب</button>`}
-  ${isOpenP(S.period)?"":`<span class="muted">· ${PN[S.period]} نفسها مغلقة، أتحها من الإعدادات</span>`}</div>`}
-function sc(i){return "sc"+(i%5===0?" ss":"")+(i%5===4?" se":"")}
-function gradeTab(){const p=S.period;const st=sortedStudents();let html=toolbar();
-  if(S.tab==="weekly"){const ws=weeksOf(p);if(!ws.includes(S.week))S.week=ws[0];const w=S.week,a="w"+w;
-    html+=weekChips(ws,st,(g,x)=>weekTotal(g,x)!=null)+`
-    <p class="hint">الأسبوع ${w}: حصتان، لكل حصة 10 درجات (5 بنود × 2). زر «−» بجانب الانضباط يخصم نصف درجة لكل سلوك. اضغط الرقم أعلى أي عمود لرصده لكل الطلاب الظاهرين، أو اكتب درجة كل طالب في خانته. Enter ينقلك للطالب التالي.</p>
-    <div class="scroll"><table class="grid"><thead>
-    <tr><th rowspan="3" class="name">الطالب</th><th colspan="5" class="sh">الحصة الأولى</th><th colspan="5" class="sh">الحصة الثانية</th><th rowspan="2">مجموع الأسبوع</th><th rowspan="3"></th></tr>
-    <tr class="crit">${[...Array(10)].map((_,i)=>`<th class="${sc(i)}">${CRIT[i%5]}</th>`).join("")}</tr>
-    <tr>${[...Array(10)].map((_,i)=>`<th class="${sc(i)}">${fillBtn("w",a,i,2,(i<5?"الحصة الأولى · ":"الحصة الثانية · ")+CRIT[i%5])}</th>`).join("")}<th><button class="fill" data-act="fillweek" data-a="${a}" title="رصد الأسبوع كاملًا">20</button></th></tr>
-    </thead><tbody>${st.map((s,ri)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${[...Array(10)].map((_,i)=>`<td class="${sc(i)}">${i%5===4?`<span class="dcell">${cell(s.nid,"w",a,i,2)}<button class="ded" data-act="ded" data-nid="${s.nid}" data-a="${a}" data-s="${i<5?0:1}" title="خصم سلوك من الانضباط" aria-label="خصم سلوك">−</button></span>`:cell(s.nid,"w",a,i,2)}</td>`).join("")}
-      <td class="calc tot" data-calc="wk" data-nid="${s.nid}"></td><td><button class="btn sm" data-act="rowfull" data-nid="${s.nid}" data-a="${a}">كامل</button></td></tr>`).join("")}</tbody></table></div>`;
-  }else if(S.tab==="exams"){
-    html+=`<p class="hint">${PN[p]}: التقييمات من 60. المهام تُحسب تلقائيًا من سجل المتابعة (مجموع الأسابيع ÷ ${weeksOf(p).length*20/40}).</p>
-    <div class="scroll"><table class="grid"><thead><tr><th rowspan="2" class="name">الطالب</th>${EXAMS.map(e=>`<th>${e.l}</th>`).join("")}<th rowspan="2">المهام<br>من 40</th><th rowspan="2">التقييمات<br>من 60</th><th rowspan="2">المجموع<br>من 100</th><th rowspan="2">الاستثنائية</th></tr>
-    <tr>${EXAMS.map((e,i)=>`<th>${fillBtn("ex",p,i,e.m,e.l)}</th>`).join("")}</tr></thead>
-    <tbody>${st.map((s,ri)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${EXAMS.map((e,i)=>`<td>${cell(s.nid,"ex",p,i,e.m,true)}</td>`).join("")}
-      <td class="calc" data-calc="tasks" data-nid="${s.nid}"></td><td class="calc" data-calc="exs" data-nid="${s.nid}"></td><td class="calc tot" data-calc="total" data-nid="${s.nid}"></td><td class="xs" data-calc="xs" data-nid="${s.nid}"></td></tr>`).join("")}</tbody></table></div>`;
-  }else if(S.tab==="extras"){const xs=cfg().extras;const ws=weeksOf(p);if(!ws.includes(S.week))S.week=ws[0];const w=S.week,a="w"+w;
-    html+=`<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><h3>بنود الدرجات الاستثنائية</h3><p class="hint" style="margin:0">تُرصد كل أسبوع، وتُجمع في سجل الفترة، وتظهر بجانب مجموع الفترة دون أن تدخل في الـ 100.</p></div>
-      <form id="fX" style="display:flex;gap:8px;flex-wrap:wrap"><input class="input" id="xl" placeholder="اسم البند، مثل: مسابقة" style="width:200px" required><input class="input" id="xm" placeholder="الدرجة" inputmode="decimal" style="width:90px" required><button class="btn primary" type="submit">إضافة بند</button></form></div>
-      <ul class="list" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${xs.map(t=>`<li><span>${esc(t.label)} <span class="chip">${t.max}</span></span><button class="btn sm danger" data-act="delx" data-k="${esc(t.k)}">حذف</button></li>`).join("")}</ul></div>
-    <div class="seg subseg" role="group" style="max-width:420px"><button data-act="xmode" data-m="week" aria-pressed="${S.xmode==="week"}">الرصد الأسبوعي</button><button data-act="xmode" data-m="sum" aria-pressed="${S.xmode==="sum"}">سجل الدرجات الاستثنائية</button></div>`;
-    if(S.xmode==="week"){
-      html+=weekChips(ws,st,(g,x)=>xs.some(t=>xwk(g,x,t.k)!=null))+`<p class="hint">الأسبوع ${w}: الحد الأعلى لكل بند في الأسبوع هو الرقم أعلى عموده، واضغطه لرصد العمود كاملًا.</p>
-      <div class="scroll"><table class="grid"><thead><tr><th rowspan="2" class="name">الطالب</th>${xs.map(t=>`<th>${esc(t.label)}</th>`).join("")}<th rowspan="2">مجموع الأسبوع</th><th rowspan="2">مجموع الفترة</th></tr>
-      <tr>${xs.map(t=>`<th>${fillBtn("xw",a,t.k,t.max,t.label+" · الأسبوع "+w,true)}</th>`).join("")}</tr></thead>
-      <tbody>${st.map((s,ri)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${xs.map(t=>`<td>${cell(s.nid,"xw",a,t.k,t.max)}</td>`).join("")}<td class="xs" data-calc="xwk" data-nid="${s.nid}"></td><td class="xs" data-calc="xs" data-nid="${s.nid}"></td></tr>`).join("")}</tbody></table></div>`;
-    }else{
-      html+=`<p class="hint">${PN[p]}: مجموع ما رُصد لكل بند في الأسابيع ${ws[0]}–${ws[ws.length-1]}.</p>
-      <div class="scroll"><table class="grid"><thead><tr><th class="name">الطالب</th>${xs.map(t=>`<th>${esc(t.label)}</th>`).join("")}<th>مجموع الاستثنائية</th><th>مجموع الفترة<br>من 100</th></tr></thead>
-      <tbody>${st.map((s,ri)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${xs.map(t=>`<td data-calc="xt:${esc(t.k)}" data-nid="${s.nid}"></td>`).join("")}<td class="xs" data-calc="xs" data-nid="${s.nid}"></td><td class="calc tot" data-calc="total" data-nid="${s.nid}"></td></tr>`).join("")}</tbody></table></div>`;
-    }
-  }else if(S.tab==="final"){const ws=weeksOf(p);const fm=S.fmode||"final";const row=(s,ri,cells)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${cells.map(([k,c])=>`<td class="${c}" data-calc="F${k}" data-nid="${s.nid}"></td>`).join("")}</tr>`;
-    html+=`<div class="seg subseg" role="group" style="max-width:420px"><button data-act="fmode" data-m="final" aria-pressed="${fm==="final"}">الكشف النهائي</button><button data-act="fmode" data-m="surplus" aria-pressed="${fm==="surplus"}">كشف فائض الاستثنائي</button></div>`;
-    if(fm==="final")html+=`<p class="hint">${PN[p]} (الأسابيع ${ws[0]}–${ws[ws.length-1]}): تُجبر الكسور (أقل من النصف لا يُحسب، والنصف فما فوق يُكمَّل)، ثم تُضاف الدرجات الاستثنائية لتكمل نقص المهام أولًا ثم التقييمات، وما زاد يظهر في كشف الفائض.</p>
-    <div class="scroll"><table class="grid"><thead><tr><th class="name">الطالب</th><th>المهام<br>من 40</th><th>التقييمات<br>من 60</th><th>المجموع<br>من 100</th></tr></thead>
-    <tbody>${st.map((s,ri)=>row(s,ri,[["t","calc"],["e","calc"],["T","calc tot"]])).join("")}</tbody></table></div>`;
-    else html+=`<p class="hint">${PN[p]}: مجموع الدرجات الاستثنائية لكل طالب، وما استُخدم منها لإكمال درجته في الكشف النهائي، والفائض المتبقي.</p>
-    <div class="scroll"><table class="grid"><thead><tr><th class="name">الطالب</th><th>الدرجة قبل الإضافة<br>من 100</th><th>مجموع الاستثنائي</th><th>المضاف للكشف</th><th>الفائض</th></tr></thead>
-    <tbody>${st.map((s,ri)=>row(s,ri,[["b",""],["x",""],["u","calc"],["s","calc tot"]])).join("")}</tbody></table></div>`;
-  }else{const ws=weeksOf(p);
-    html+=`<p class="hint">${PN[p]}: مجموع الأسابيع من ${ws.length*20} يُحوَّل إلى 40، ثم تُضاف التقييمات (60). العمود الأخير للدرجات الاستثنائية ولا يدخل في المجموع.</p>
-    <div class="scroll"><table class="grid"><thead><tr><th class="name">الطالب</th>${ws.map(w=>`<th>أ${w}</th>`).join("")}<th>المجموع<br>من ${ws.length*20}</th><th>المهام<br>من 40</th>${EXAMS.map(e=>`<th>${e.l.replace("اختبار ","")}<br>من ${e.m}</th>`).join("")}<th>المجموع<br>من 100</th><th>الاستثنائية</th></tr></thead>
-    <tbody>${st.map((s,ri)=>`<tr data-nid="${s.nid}" data-name="${esc(s.name)}" data-cls="${esc(s.cls||"")}">${nameCell(s,ri)}${ws.map(w=>`<td data-calc="w:${w}" data-nid="${s.nid}"></td>`).join("")}
-      <td class="calc" data-calc="wsum" data-nid="${s.nid}"></td><td class="calc" data-calc="tasks" data-nid="${s.nid}"></td>${EXAMS.map((e,i)=>`<td data-calc="e:${i}" data-nid="${s.nid}"></td>`).join("")}
-      <td class="calc tot" data-calc="total" data-nid="${s.nid}"></td><td class="xs" data-calc="xs" data-nid="${s.nid}"></td></tr>`).join("")}</tbody></table></div>`;
-  }
-  return html}
-
-function studentsTab(){const st=sortedStudents();
-  return `<div class="grid2">
-  <div class="card stack"><h3>إضافة طالب</h3><form class="stack" id="fAdd">
-    <div class="field"><label for="a_nid">رقم الهوية</label><input class="input" id="a_nid" inputmode="numeric" maxlength="10" required></div>
-    <div class="field"><label for="a_name">اسم الطالب</label><input class="input" id="a_name" required></div>
-    <div class="field"><label for="a_cls">الفصل (اختياري)</label><input class="input" id="a_cls" placeholder="مثل: 1/أ"></div>
-    <button class="btn primary" type="submit">إضافة</button></form></div>
-  <div class="card stack"><h3>إضافة مجموعة طلاب</h3><p class="hint" style="margin:0">الصق من Excel: كل طالب في سطر — رقم الهوية ثم الاسم ثم الفصل (اختياري)، مفصولة بعلامة جدولة أو فاصلة.</p>
-    <textarea class="input" id="bulk" placeholder="1012345678	محمد أحمد	1/أ"></textarea><div class="err" id="eBulk"></div><button class="btn primary" data-act="bulk">استيراد</button></div>
-  </div>
-  <div class="card" style="margin-top:16px"><h3>الطلاب المسجلون (${st.length})</h3><p class="hint" style="margin:4px 0 0">أرقام الهوية محفوظة في تبويب «سجل الهويات» المقفل برمز.</p>
-  ${st.length?`<div class="scroll" style="margin-top:10px"><table class="grid"><thead><tr><th class="name">الاسم</th><th>الفصل</th><th></th></tr></thead><tbody>
-  ${st.map((s,i)=>`<tr><td class="name"><span class="idx">${i+1}</span>${esc(s.name)}</td><td>${esc(s.cls||"—")}</td><td><button class="btn sm danger" data-act="delst" data-nid="${s.nid}">حذف</button></td></tr>`).join("")}</tbody></table></div>`
-  :`<p class="muted">لم يُضف أي طالب بعد.</p>`}</div>`}
-
-function idsTab(){
-  if(!S.lockLoaded)return `<div class="card empty">جارٍ التحميل…</div>`;
-  if(!S.lock)return S.canEdit?`<div class="card login stack" style="margin:0 auto"><h2>إنشاء رمز سجل الهويات</h2><p class="muted" style="margin:0">اختر رمزًا من 5 أرقام. سيُطلب في كل مرة يُفتح فيها السجل.</p>
-    <form class="stack" id="fLockSet"><div class="field"><label for="lk1">الرمز</label><input class="input" id="lk1" type="password" inputmode="numeric" maxlength="5" dir="ltr"></div>
-    <div class="field"><label for="lk2">تأكيد الرمز</label><input class="input" id="lk2" type="password" inputmode="numeric" maxlength="5" dir="ltr"></div><div class="err" id="eLock"></div><button class="btn primary" type="submit">حفظ الرمز</button></form></div>`
-    :`<div class="card empty"><h3>السجل غير مفعّل بعد</h3><p>يحدد مالك المنصة رمز سجل الهويات أولًا.</p></div>`;
-  if(!S.idOpen)return `<div class="card login stack" style="margin:0 auto"><h2>سجل الهويات مقفل</h2>
-    <form class="stack" id="fUnlock"><div class="field"><label for="lku">أدخل الرمز المكوّن من 5 أرقام</label><input class="input" id="lku" type="password" inputmode="numeric" maxlength="5" dir="ltr" autocomplete="off"></div><div class="err" id="eUnlock"></div><button class="btn primary" type="submit">فتح السجل</button></form></div>`;
-  const st=sortedStudents();
-  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><h3>سجل الهويات (${st.length})</h3><p class="hint" style="margin:0">يُقفل تلقائيًا عند مغادرة التبويب أو تسجيل الخروج.</p></div><button class="btn" data-act="lockids">قفل السجل</button></div>
-  <div class="scroll" style="margin-top:10px"><table class="grid"><thead><tr><th class="name">الاسم</th><th>الفصل</th><th>رقم الهوية</th></tr></thead><tbody>
-  ${st.map((s,i)=>`<tr><td class="name"><span class="idx">${i+1}</span>${esc(s.name)}</td><td>${esc(s.cls||"—")}</td><td dir="ltr">${esc(s.nid)}</td></tr>`).join("")}</tbody></table></div></div>
-  ${S.canEdit?`<div class="card" style="margin-top:16px"><h3>تغيير الرمز</h3><form id="fLockChange" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input class="input" id="lkn" type="password" inputmode="numeric" maxlength="5" dir="ltr" placeholder="الرمز الجديد" style="width:160px"><button class="btn primary" type="submit">حفظ</button></form></div>`:""}`}
-
-function settingsTab(){const c=cfg();
-  return `<div class="card stack" style="margin-bottom:16px"><div><h3>إتاحة الدرجات للطلاب</h3><p class="hint" style="margin:0">لا يرى الطالب إلا الفترات والأسابيع المتاحة. المغلق يبقى ظاهرًا لك وحدك.</p></div>
-    <div class="grid2">${["p1","p2"].map(p=>`<div class="stack" style="gap:8px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>${PN[p]}</b>
-      ${isOpenP(p)?`<span class="state on">متاحة</span><button class="btn sm" data-act="togP" data-p="${p}">إغلاق الفترة</button>`:`<span class="state off">مغلقة</span><button class="btn sm primary" data-act="togP" data-p="${p}">إتاحة الفترة</button>`}</div>
-      <div class="wtoggle">${weeksOf(p).map(w=>`<button data-act="togW" data-w="${w}" aria-pressed="${isOpenW(w)}" title="${isOpenW(w)?"متاح — اضغط للإغلاق":"مغلق — اضغط للإتاحة"}">${w}</button>`).join("")}</div>
-      <button class="btn sm" data-act="openAllW" data-p="${p}" style="justify-self:start">إتاحة كل أسابيع الفترة</button></div>`).join("")}</div></div>
-  <div class="grid2"><div class="card stack"><h3>بيانات المنصة</h3><form class="stack" id="fSet">
-    <div class="field"><label for="s_school">اسم المدرسة</label><input class="input" id="s_school" value="${esc(c.school)}"></div>
-    <div class="field"><label for="s_subject">المادة</label><input class="input" id="s_subject" value="${esc(c.subject)}" placeholder="مثل: المهارات الرقمية"></div>
-    <div class="row3"><div class="field"><label for="p1f">الفترة الأولى من أسبوع</label><input class="input" id="p1f" inputmode="numeric" value="${c.p1.from}"></div><div class="field"><label for="p1t">إلى أسبوع</label><input class="input" id="p1t" inputmode="numeric" value="${c.p1.to}"></div></div>
-    <div class="row3"><div class="field"><label for="p2f">الفترة الثانية من أسبوع</label><input class="input" id="p2f" inputmode="numeric" value="${c.p2.from}"></div><div class="field"><label for="p2t">إلى أسبوع</label><input class="input" id="p2t" inputmode="numeric" value="${c.p2.to}"></div></div>
-    <p class="hint" style="margin:0">المهام = مجموع الأسابيع ÷ (عدد الأسابيع × 20) × 40. مع 8 أسابيع: 160 ÷ 4 = 40.</p>
-    <div class="err" id="eSet"></div><button class="btn primary" type="submit">حفظ</button></form></div>
-  <div class="card stack"><h3>حسابي</h3><p class="hint" style="margin:0">${esc(S.session.name)}</p>
-    <form class="stack" id="fMyPw" autocomplete="off"><div class="field"><label for="mp0">كلمة المرور الحالية</label><input class="input" id="mp0" type="password" dir="ltr" autocomplete="current-password"></div>
-    <div class="row3"><div class="field"><label for="mp1">كلمة المرور الجديدة</label><input class="input" id="mp1" type="password" dir="ltr" autocomplete="new-password"></div><div class="field"><label for="mp2">تأكيدها</label><input class="input" id="mp2" type="password" dir="ltr" autocomplete="new-password"></div></div>
-    <div class="err" id="eMy"></div><button class="btn primary" type="submit" style="justify-self:start">تغيير كلمة المرور</button></form></div>
-  <div class="card stack"><h3>حسابات المعلمين</h3>
-  ${S.canEdit?`<ul class="list">${(S.teachers||[]).map(t=>`<li><span>${esc(t.name)} <span class="muted" dir="ltr">${esc(t.u)}</span></span>${t.u===S.session.id?`<span class="muted" style="font-size:13px">أنت</span>`:`<button class="btn sm danger" data-act="delt" data-u="${esc(t.u)}">حذف</button>`}</li>`).join("")}</ul>
-  <form class="stack" id="fTeach"><div class="field"><label for="t_n">اسم المعلم</label><input class="input" id="t_n" required></div>
-  <div class="row3"><div class="field"><label for="t_u">اسم المستخدم</label><input class="input" id="t_u" dir="ltr" required></div><div class="field"><label for="t_p">كلمة المرور</label><input class="input" id="t_p" dir="ltr" required minlength="6"></div></div>
-  <div class="err" id="eTeach"></div><button class="btn primary" type="submit">إضافة معلم</button></form>`
-  :`<p class="muted">إضافة المعلمين وحذفهم متاحة لمالك المنصة فقط.</p>`}</div>
-  <div class="card stack"><h3>نقل الدرجات من بوابة التعلم</h3><p class="hint" style="margin:0">في بوابة التعلم افتح تبويب «الدرجات» واضغط «تصدير الدرجات ملف CSV»، ثم ارفع الملف هنا، أو الصق النص المنسوخ في الخانة. تُنقل اختبارات الأسبوع 4 و7 والحضوري إلى تقييمات الفترة الأولى، ودرجة المتابعة (من 40) إلى مهام الفترة الأولى. تُتجاهل القيم الصفرية.</p>
-    <div class="field"><label for="impFile">ملف CSV</label><input class="input" id="impFile" type="file" accept=".csv,text/csv"></div>
-    <p class="hint" style="margin:0">تُطابَق الدرجات باسم الطالب. الأعمدة المقبولة: الاسم، اختبار الأسبوع 4، اختبار الأسبوع 7، الاختبار الحضوري، المتابعة. ترتيب الأعمدة لا يهم.</p>
-    <textarea class="input" id="imp" dir="ltr" placeholder="أو الصق النص المنسوخ هنا" style="min-height:80px"></textarea><div class="err" id="eImp"></div><button class="btn primary" data-act="import">نقل الدرجات</button></div></div>`}
-
-/* ---------- live values in grade tables ---------- */
-function calcFor(nid,spec){const g=G(nid),p=S.period;
-  if(spec==="wk")return weekTotal(g,S.week);
-  if(spec[0]==="F"){const f=fin(g,p);return f[spec.slice(1)]}
-  if(spec==="tasks")return rnd(tasks(g,p));if(spec==="exs")return examsSum(g,p);if(spec==="total")return rnd(rnd(tasks(g,p))+examsSum(g,p));
-  if(spec==="wsum")return weeksSum(g,p);if(spec==="xwk")return xweek(g,S.week);if(spec.startsWith("xt:"))return xval(g,p,spec.slice(3));if(spec==="xs")return xsum(g,p);
-  if(spec.startsWith("w:"))return weekTotal(g,+spec.slice(2));if(spec.startsWith("e:"))return exam(g,p,+spec.slice(2));return null}
-function inputVal(el){const g=G(el.dataset.nid),k=el.dataset.k,a=el.dataset.a,i=el.dataset.i;
-  if(k==="w")return num(((g.w||{})[a]||[])[+i]);if(k==="xw")return num(((g.xw||{})[a]||{})[i]);if(k==="ex")return num(((g.ex||{})[a]||[])[+i]);return num(((g.x||{})[a]||{})[i])}
-function refreshRow(nid){$$(`[data-calc][data-nid="${nid}"]`).forEach(td=>{const v=calcFor(nid,td.dataset.calc);td.textContent=(td.dataset.calc==="xs"||td.dataset.calc==="xwk")?(v?"+"+fmt(v):"—"):fmt(v)})}
-function refreshValues(){$$("input.cell").forEach(el=>{if(el!==document.activeElement){const v=inputVal(el);el.value=v==null?"":String(v);el.classList.remove("bad")}});
-  const done=new Set();$$("[data-calc]").forEach(td=>{if(!done.has(td.dataset.nid)){done.add(td.dataset.nid);refreshRow(td.dataset.nid)}});
-  const xs=cfg().extras;$$(".weeks button").forEach(b=>{const w=+b.dataset.w;b.classList.toggle("done",[...S.students.keys()].some(n=>S.tab==="extras"?xs.some(t=>xwk(G(n),w,t.k)!=null):weekTotal(G(n),w)!=null))})}
-function reportTitle(){const p=PN[S.period];
-  if(S.tab==="final")return (S.fmode==="surplus"?"كشف فائض الدرجات الاستثنائية":"الكشف النهائي")+` · ${p}`;
-  if(S.tab==="weekly")return `سجل المتابعة · الأسبوع ${S.week} · ${p}`;
-  if(S.tab==="exams")return `التقييمات · ${p}`;
-  if(S.tab==="extras")return S.xmode==="week"?`الدرجات الاستثنائية · الأسبوع ${S.week} · ${p}`:`سجل الدرجات الاستثنائية · ${p}`;
-  return `السجل التجميعي · ${p}`}
-async function printReport(){const tb=$("#view .scroll table.grid");if(!tb){toast("لا يوجد جدول لطباعته.");return}
-  const t=tb.cloneNode(true);
-  t.querySelectorAll("tbody tr").forEach(tr=>{if(tr.hidden)tr.remove()});
-  t.querySelectorAll("input.cell").forEach(i=>{const v=inputVal(i);i.replaceWith(document.createTextNode(v==null?"":String(v)))});
-  t.querySelectorAll(".fill").forEach(b=>b.replaceWith(document.createTextNode(b.textContent)));
-  t.querySelectorAll("button").forEach(b=>b.remove());
-  t.querySelectorAll("[data-act],[data-nid],[data-calc],[id]").forEach(e=>{e.removeAttribute("id")});
-  const c=cfg(),title=reportTitle(),cls=S.cls?"الفصل "+S.cls:"كل الفصول";
-  const date=new Date().toLocaleDateString("ar-SA-u-nu-latn",{year:"numeric",month:"long",day:"numeric"});
-  const doc=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:12px}
-.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0F6B5C;padding-bottom:8px;margin-bottom:10px}
-.hd h1{font-size:17px;margin:0 0 4px;color:#0F6B5C}.hd div{line-height:1.7}
-table{border-collapse:collapse;width:100%}th,td{border:1px solid #777;padding:3px 4px;text-align:center;white-space:nowrap}
-thead{display:table-header-group}th{background:#EEF3F1}tr{page-break-inside:avoid}
-td.name,th.name{text-align:right;white-space:normal;min-width:150px}.name small{display:block;color:#666;font-size:10px}.idx{color:#666;margin-left:6px}
-.ss{border-right:2.5px solid #000}.se{border-left:2.5px solid #000}th.sh{border:2.5px solid #000}tbody tr:last-child td.sc{border-bottom:2.5px solid #000}
-.tot{font-weight:bold;color:#0F6B5C}.xs{color:#8a6210;font-weight:bold}
-.sig{margin-top:28px;display:flex;justify-content:space-between}.sig div{min-width:220px}
-.bar{margin:0 0 10px}@media print{.bar{display:none}}.bar button{font:inherit;padding:6px 16px;border:1px solid #0F6B5C;background:#0F6B5C;color:#fff;border-radius:6px;cursor:pointer}
-</style></head><body><div class="bar"><button onclick="print()">طباعة</button></div>
-<div class="hd"><div><h1>${esc(title)}</h1><div>${esc(c.school)}${c.subject?" · "+esc(c.subject):""} · ${esc(cls)}</div></div><div>التاريخ: ${esc(date)}<br>عدد الطلاب: ${t.tBodies[0].rows.length}</div></div>
-${t.outerHTML}
-<div class="sig"><div>معلم المادة: ${esc(S.session.name||"")}<br><br>التوقيع: ....................</div><div>مدير المدرسة:<br><br>التوقيع: ....................</div></div>
-<script>addEventListener("load",function(){setTimeout(function(){try{print()}catch(e){}},400)})<\/script></body></html>`;
-  let d=null;try{d=await claude.use("downloads")}catch{}
-  if(!d){toast("الطباعة غير متاحة في هذا العرض. افتح المنصة من متصفح الحاسب.");return}
-  try{await d.save({filename:title.replace(/ · /g,"-").replace(/\s+/g,"-")+".html",data:doc});toast("حُفظ التقرير. افتح الملف وستظهر نافذة الطباعة تلقائيًا.")}
-  catch(e){if(!e||e.code!=="declined")toast("تعذّر حفظ التقرير.")}}
-function freezeNames(){$$(".scroll").forEach(sc=>{const tb=sc.querySelector("table.grid");const first=tb&&tb.querySelector("tbody td.name");if(!first||!tb.tBodies[0])return;
-  let wrap=sc.parentElement;if(!wrap.classList.contains("fwrap")){wrap=document.createElement("div");wrap.className="fwrap";wrap.style.cssText=sc.getAttribute("style")||"";sc.removeAttribute("style");sc.parentNode.insertBefore(wrap,sc);wrap.appendChild(sc)}
-  let fz=wrap.querySelector(":scope>.freeze");if(!fz){fz=document.createElement("div");fz.className="freeze";fz.setAttribute("aria-hidden","true");wrap.appendChild(fz)}
-  const head=tb.tHead,hn=head&&head.querySelector("th.name");
-  const html=`<div class="fz-h" style="height:${head?head.getBoundingClientRect().height:0}px">${hn?hn.innerHTML:""}</div>`+
-    [...tb.tBodies[0].rows].map(tr=>{const nc=tr.querySelector("td.name");return tr.hidden?"":`<div class="fz-r" style="height:${tr.getBoundingClientRect().height}px"><div>${nc?nc.innerHTML:""}</div></div>`}).join("");
-  fz.style.width=first.getBoundingClientRect().width+"px";if(fz.innerHTML!==html)fz.innerHTML=html})}
-let fzT=null;addEventListener("resize",()=>{clearTimeout(fzT);fzT=setTimeout(freezeNames,120)});
-try{document.fonts&&document.fonts.ready.then(()=>freezeNames())}catch{}
-function applyFilter(){const q=S.q.trim(),c=S.cls;$$("tbody tr[data-nid]").forEach(tr=>{tr.hidden=!!((c&&tr.dataset.cls!==c)||(q&&!tr.dataset.name.includes(q)))});freezeNames()}
-function visibleNids(){return $$("tbody tr[data-nid]").filter(tr=>!tr.hidden).map(tr=>tr.dataset.nid)}
-
-/* ---------- popover for column fill ---------- */
-function openPop(btn,spec){const pop=$("#pop");const n=visibleNids().length;S.popSpec=spec;
-  pop.innerHTML=spec.week?`<div class="t">رصد الأسبوع لـ ${n} طالبًا ظاهرًا</div><button class="btn primary" data-act="pfweek" data-v="2">رصد 20 للجميع (كل البنود 2)</button><button class="btn" data-act="pfweek" data-v="">تفريغ الأسبوع</button>`
-  :`<div class="t">${esc(spec.label)} · ${n} طالبًا ظاهرًا</div><button class="btn primary" data-act="pf" data-v="${spec.max}">رصد ${spec.max} للجميع</button>
-   <div class="row"><input class="input" id="pv" inputmode="decimal" placeholder="درجة أخرى"><button class="btn" data-act="pfc">تطبيق</button></div>
-   <button class="btn" data-act="pf" data-v="">تفريغ العمود</button>`;
-  pop.hidden=false;const r=btn.getBoundingClientRect();const w=240;let left=Math.min(Math.max(8,r.left+r.width/2-w/2),innerWidth-w-8);let top=r.bottom+6;if(top+190>innerHeight)top=Math.max(8,r.top-196);pop.style.left=left+"px";pop.style.top=top+"px"}
-function closePop(){$("#pop").hidden=true;S.popSpec=null;S.ded=null}
-function placePop(btn){const pop=$("#pop");pop.hidden=false;const r=btn.getBoundingClientRect();const w=240,h=pop.offsetHeight||200;let left=Math.min(Math.max(8,r.left+r.width/2-w/2),innerWidth-w-8);let top=r.bottom+6;if(top+h>innerHeight)top=Math.max(8,r.top-h-6);pop.style.left=left+"px";pop.style.top=top+"px"}
-function openDed(nid,a,sess){S.popSpec=null;S.ded={nid,a,s:sess};const g=G(nid);const st=S.students.get(nid)||{};
-  const list=behList(g,a).map((x,ix)=>({...x,ix})).filter(x=>x.s===sess);const v=num(weekArr(g,+a.slice(1))[sess*5+4]);
-  $("#pop").innerHTML=`<div class="t">${esc(st.name||"")} · ${sess?"الحصة الثانية":"الحصة الأولى"} · الانضباط ${v==null?"—":fmt(v)} من 2</div>
-    ${Object.entries(BEH).map(([k,l])=>`<button class="btn" data-act="beh" data-t="${k}">${l} <span class="muted">−${DED}</span></button>`).join("")}
-    ${list.length?`<div class="t">السلوكيات المسجلة</div>${list.map(x=>`<div class="beh"><span>${esc(BEH[x.t]||x.t)}</span><button class="btn sm" data-act="unbeh" data-ix="${x.ix}">إلغاء</button></div>`).join("")}`:""}`;
-  placePop(S.dedBtn)}
-function addBeh(t){const d=S.ded;if(!d)return;const di=d.s*5+4;let floor=false;
-  editG(d.nid,g=>{const list=behList(g,d.a).slice();list.push({s:d.s,t});g.beh={...(g.beh||{}),[d.a]:list};
-    const arr=((g.w||{})[d.a]||Array(10).fill(null)).slice();while(arr.length<10)arr.push(null);const cur=num(arr[di]);const base=cur==null?2:cur;
-    if(base<=0)floor=true;arr[di]=Math.max(0,r2(base-DED));g.w={...(g.w||{}),[d.a]:arr};queue(d.nid,{w:{[d.a]:arr},beh:{[d.a]:list}})});
-  refreshValues();toast(floor?"سُجّل السلوك، والانضباط صفر بالفعل":`خُصم ${DED} من الانضباط: ${BEH[t]}`);openDed(d.nid,d.a,d.s)}
-function removeBeh(ix){const d=S.ded;if(!d)return;
-  editG(d.nid,g=>{const list=behList(g,d.a).slice();const x=list.splice(ix,1)[0];if(!x)return;g.beh={...(g.beh||{}),[d.a]:list};const di=x.s*5+4;
-    const arr=((g.w||{})[d.a]||Array(10).fill(null)).slice();const cur=num(arr[di])||0;arr[di]=Math.min(2,r2(cur+DED));g.w={...(g.w||{}),[d.a]:arr};queue(d.nid,{w:{[d.a]:arr},beh:{[d.a]:list}})});
-  refreshValues();toast("أُلغي الخصم");openDed(d.nid,d.a,d.s)}
-function applyFill(v){const sp=S.popSpec;if(!sp)return;const nids=visibleNids();
-  if(sp.week){for(const nid of nids)for(let i=0;i<10;i++)setCell(nid,"w",sp.a,i,v)}
-  else{if(v!=null&&(v<0||v>sp.max)){toast(`الدرجة يجب أن تكون بين 0 و ${sp.max}`);return}
-    const i=(sp.k==="x"||sp.k==="xw")?sp.i:+sp.i;for(const nid of nids)setCell(nid,sp.k,sp.a,i,v)}
-  closePop();refreshValues();toast(v==null?"تم تفريغ العمود":`تم الرصد لـ ${nids.length} طالبًا`)}
-
-/* ---------- events ---------- */
-document.addEventListener("click",async e=>{const b=e.target.closest("[data-act]");
-  if(!$("#pop").hidden&&!e.target.closest("#pop")&&!(b&&["fill","fillweek","ded"].includes(b.dataset.act)))closePop();
-  if(!b)return;const a=b.dataset.act;
-  if(a==="mode"){S.loginMode=b.dataset.m;render()}
-  else if(a==="logout"){S.session=null;S.msgOpen=false;S.stWeek=null;S.idOpen=false;if(S.unsubMsgs){S.unsubMsgs();S.unsubMsgs=null}S.msgs=[];S.msgsFor=null;S.thread=null;S.stInbox=false;S.msgOk=undefined;saveSession();render()}
-  else if(a==="tab"){if(b.dataset.t!=="ids")S.idOpen=false;S.tab=b.dataset.t;render()}
-  else if(a==="period"){S.period=b.dataset.p;render()}
-  else if(a==="week"){S.week=+b.dataset.w;render()}
-  else if(a==="xmode"){S.xmode=b.dataset.m;render()}
-  else if(a==="fill")openPop(b,{k:b.dataset.k,a:b.dataset.a,i:b.dataset.i,max:+b.dataset.max,label:b.dataset.label});
-  else if(a==="fillweek")openPop(b,{week:true,a:b.dataset.a});
-  else if(a==="ded"){S.dedBtn=b;openDed(b.dataset.nid,b.dataset.a,+b.dataset.s)}
-  else if(a==="beh")addBeh(b.dataset.t);
-  else if(a==="thread"){S.thread=b.dataset.u;S.draft="";S.pfile=null;render()}
-  else if(a==="send")sendMsg();
-  else if(a==="print")printReport();
-  else if(a==="fmode"){S.fmode=b.dataset.m;render()}
-  else if(a==="msgopen"){S.msgOpen=true;render();const t=$("#mText");if(t)t.focus()}
-  else if(a==="msgclose"){S.msgOpen=false;render()}
-  else if(a==="stweek"){const w=+b.dataset.w;S.stWeek=S.stWeek===w?null:w;render()}
-  else if(a==="togP"){const o={...cfg().open};o[b.dataset.p]=!o[b.dataset.p];await saveSettings({open:o});toast(o[b.dataset.p]?`أُتيحت ${PN[b.dataset.p]} للطلاب`:`أُغلقت ${PN[b.dataset.p]} عن الطلاب`)}
-  else if(a==="togW"){const w=+b.dataset.w;const ow=cfg().openWeeks;const on=!ow.includes(w);await saveSettings({openWeeks:on?[...ow,w].sort((x,y)=>x-y):ow.filter(x=>x!==w)});toast(on?`أُتيح الأسبوع ${w} للطلاب`:`أُغلق الأسبوع ${w} عن الطلاب`)}
-  else if(a==="openAllW"){const ws=weeksOf(b.dataset.p);await saveSettings({openWeeks:[...new Set([...cfg().openWeeks,...ws])].sort((x,y)=>x-y)});toast("أُتيحت كل أسابيع "+PN[b.dataset.p])}
-  else if(a==="unfile"){S.pfile=null;renderFileChip()}
-  else if(a==="unbeh")removeBeh(+b.dataset.ix);
-  else if(a==="pf")applyFill(b.dataset.v===""?null:+b.dataset.v);
-  else if(a==="pfweek")applyFill(b.dataset.v===""?null:+b.dataset.v);
-  else if(a==="pfc"){const v=parseFloat(($("#pv").value||"").replace(",","."));if(Number.isNaN(v)){toast("اكتب درجة رقمية");return}applyFill(v)}
-  else if(a==="rowfull"){for(let i=0;i<10;i++)setCell(b.dataset.nid,"w",b.dataset.a,i,2);refreshValues()}
-  else if(a==="delst"||a==="delt"||a==="delx"){if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="تأكيد الحذف";setTimeout(()=>{b.classList.remove("armed");b.textContent="حذف"},3500);return}
-    try{if(a==="delst"){await S.db.doc("students/"+b.dataset.nid).delete();await S.db.doc("grades/"+b.dataset.nid).delete();toast("حُذف الطالب")}
-      else if(a==="delt"){await S.db.doc("data/staff/teachers/"+b.dataset.u).delete();toast("حُذف حساب المعلم")}
-      else{const ex=cfg().extras.filter(t=>t.k!==b.dataset.k);await saveSettings({extras:ex});toast("حُذف البند")}}
-    catch(err){toast("تعذّر الحذف: لا تملك صلاحية التعديل.")}}
-  else if(a==="bulk")bulkImport();
-  else if(a==="import")importOld();
-  else if(a==="lockids"){S.idOpen=false;render()}
-});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closePop();
-  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&e.target.id==="mText"){e.preventDefault();sendMsg();return}
-  if(e.key==="Enter"&&e.target.matches("input.cell")){e.preventDefault();const el=e.target;const id=el.id.replace("c-"+el.dataset.nid+"-","");
-    const rows=$$("tbody tr[data-nid]").filter(tr=>!tr.hidden);const ix=rows.findIndex(tr=>tr.dataset.nid===el.dataset.nid);const nx=rows[ix+(e.shiftKey?-1:1)];
-    if(nx){const t=document.getElementById("c-"+nx.dataset.nid+"-"+id);if(t){t.focus();t.select()}}}});
-document.addEventListener("input",e=>{const el=e.target;
-  if(el.id==="q"){S.q=el.value;applyFilter();return}
-  if(el.id==="mText"){S.draft=el.value;return}
-  if(el.id==="mq"){S.mq=el.value;renderThreads();return}
-  if(!el.matches("input.cell"))return;const raw=el.value.trim().replace(",",".").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d));const max=+el.dataset.max;
-  if(raw===""){el.classList.remove("bad");setCell(el.dataset.nid,el.dataset.k,el.dataset.a,(el.dataset.k==="x"||el.dataset.k==="xw")?el.dataset.i:+el.dataset.i,null);refreshRow(el.dataset.nid);return}
-  const v=Number(raw);if(Number.isNaN(v)||v<0||v>max){el.classList.add("bad");return}
-  el.classList.remove("bad");setCell(el.dataset.nid,el.dataset.k,el.dataset.a,(el.dataset.k==="x"||el.dataset.k==="xw")?el.dataset.i:+el.dataset.i,v);refreshRow(el.dataset.nid)});
-document.addEventListener("focusout",e=>{if(e.target.matches("input.cell")){const v=inputVal(e.target);e.target.value=v==null?"":String(v);e.target.classList.remove("bad")}});
-document.addEventListener("focusin",e=>{if(e.target.matches("input.cell"))e.target.select()});
-document.addEventListener("change",e=>{if(e.target.id==="clsSel"){S.cls=e.target.value;applyFilter()}
-  if(e.target.id==="impFile"&&e.target.files[0])importFile(e.target.files[0]);
-  if(e.target.id==="mFile"&&e.target.files[0]){S.pfile=e.target.files[0];e.target.value="";renderFileChip()}});
-document.addEventListener("submit",async e=>{e.preventDefault();const f=e.target.id;
-  if(f==="fS"){const nid=$("#nid").value.trim().replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d));
-    if(!/^\d{10}$/.test(nid)){$("#eS").textContent="رقم الهوية يتكون من 10 أرقام.";return}
-    const s=await S.db.doc("students/"+nid).get().catch(()=>null);
-    if(!s||!s.exists){$("#eS").textContent="رقم الهوية غير مسجّل. تأكد منه أو راجع معلمك.";return}
-    S.session={role:"s",id:nid};saveSession();S.stInbox=false;render();startStudentInbox()}
-  else if(f==="fT"){const u=toEn($("#tu").value.trim().toLowerCase()),pwRaw=$("#tp").value,er=$("#eT");
-    if(!/^[a-z0-9_.-]{3,32}$/.test(u)||!pwRaw){er.textContent=u&&!/^[a-z0-9_.-]+$/.test(u)?"اسم المستخدم يُكتب بأحرف إنجليزية أو أرقام فقط.":"اكتب اسم المستخدم وكلمة المرور.";return}
-    if(!S.db){er.textContent="المنصة لم تتصل بالبيانات بعد. أعد تحميل الصفحة.";return}
-    const s=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);
-    const fail=()=>{S.fails=(S.fails||0)+1;if(S.fails>=3){S.fails=0;S.loginMode="r";render();return true}return false};
-    if(!s||!s.exists){if(fail())return;er.textContent=S.canEdit?"اسم المستخدم غير موجود.":"تعذّر الدخول: حسابك في Claude لا يملك صلاحية «محرر» على هذه المنصة. افتحها من حساب المالك، أو اطلب من المالك منحك صلاحية «محرر».";return}
-    const h=s.data().hash,cands=[...new Set([pwRaw,toEn(pwRaw),pwRaw.trim(),toEn(pwRaw.trim())])];let ok=false;
-    for(const c of cands){if(await sha(u+"|"+c)===h){ok=true;break}}
-    if(!ok){if(fail())return;er.textContent=`كلمة المرور غير صحيحة. المحاولات المتبقية: ${3-S.fails}.`;return}
-    S.fails=0;
-    S.session={role:"t",id:u,name:s.data().name};saveSession();S.tab="weekly";startTeacherInbox();render()}
-  else if(f==="fSetup"||f==="fTeach"){const P=f==="fSetup"?"su_":"t_";const n=$("#"+P+"n").value.trim(),u=toEn($("#"+P+"u").value.trim().toLowerCase()),pw=toEn($("#"+P+"p").value.trim());const er=$("#e"+(f==="fSetup"?"Setup":"Teach"));
-    if(!/^[a-z0-9_.-]{3,32}$/.test(u)){er.textContent="اسم المستخدم: من 3 إلى 32 حرفًا إنجليزيًا أو رقمًا.";return}
-    if(pw.length<6){er.textContent="كلمة المرور 6 أحرف على الأقل.";return}
-    if((S.teachers||[]).some(t=>t.u===u)){er.textContent="اسم المستخدم مستخدم من قبل.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:n,hash:await sha(u+"|"+pw)})}catch{er.textContent="تعذّر الحفظ: إدارة الحسابات للمالك فقط.";return}
-    if(f==="fSetup"){S.session={role:"t",id:u,name:n};saveSession();S.tab="students";startTeacherInbox();render()}else{e.target.reset();toast("أُضيف المعلم")}}
-  else if(f==="fAdd"){const nid=$("#a_nid").value.trim(),name=$("#a_name").value.trim(),cls=$("#a_cls").value.trim();
-    if(!/^\d{10}$/.test(nid)){toast("رقم الهوية يتكون من 10 أرقام.");return}
-    try{await S.db.doc("students/"+nid).set({nid,name,cls});e.target.reset();$("#a_nid").focus();toast("أُضيف "+name)}catch{toast("تعذّر الحفظ: لا تملك صلاحية التعديل.")}}
-  else if(f==="fSet"){const p1={from:+$("#p1f").value,to:+$("#p1t").value},p2={from:+$("#p2f").value,to:+$("#p2t").value};
-    if(![p1,p2].every(p=>p.from>=1&&p.to>=p.from&&p.to<=60)){$("#eSet").textContent="تحقق من أرقام الأسابيع.";return}
-    await saveSettings({school:$("#s_school").value.trim()||DEF.school,subject:$("#s_subject").value.trim(),p1,p2});toast("حُفظت الإعدادات")}
-  else if(f==="fReset"){const u=toEn($("#ru").value.trim()),pw=toEn($("#rp").value.trim()),er=$("#eR");
-    if(!/^\d{10}$/.test(u)){er.textContent="رقم الهوية يتكون من 10 أرقام.";return}
-    const snap=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);const t=snap&&snap.exists?{name:snap.data().name}:null;
-    if(!t){er.textContent="رقم الهوية لا يطابق أي حساب معلم.";return}
-    if(pw.length<6){er.textContent="كلمة المرور 6 أحرف على الأقل.";return}
-    if(pw!==toEn($("#rp2").value.trim())){er.textContent="كلمتا المرور غير متطابقتين.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:t.name,hash:await sha(u+"|"+pw)})}catch{er.textContent="تعذّر الحفظ: حسابك في Claude لا يملك صلاحية «محرر» على المنصة.";return}
-    S.session={role:"t",id:u,name:t.name};saveSession();S.tab="weekly";S.loginMode="t";startTeacherInbox();render();toast("حُفظت كلمة المرور الجديدة")}
-  else if(f==="fMyPw"){const u=S.session.id,er=$("#eMy");const cur=$("#mp0").value,n1=toEn($("#mp1").value.trim()),n2=toEn($("#mp2").value.trim());
-    const snap=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);if(!snap||!snap.exists){er.textContent="تعذّر قراءة حسابك.";return}
-    let ok=false;for(const c of new Set([cur,toEn(cur),cur.trim(),toEn(cur.trim())]))if(await sha(u+"|"+c)===snap.data().hash){ok=true;break}
-    if(!ok){er.textContent="كلمة المرور الحالية غير صحيحة.";return}
-    if(n1.length<6){er.textContent="كلمة المرور الجديدة 6 أحرف على الأقل.";return}
-    if(n1!==n2){er.textContent="كلمتا المرور غير متطابقتين.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:snap.data().name,hash:await sha(u+"|"+n1)});e.target.reset();er.textContent="";toast("تم تغيير كلمة المرور")}catch{er.textContent="تعذّر الحفظ.";}}
-  else if(f==="fLockSet"||f==="fLockChange"){const c=f==="fLockSet"?$("#lk1").value.trim():$("#lkn").value.trim();
-    if(!/^\d{5}$/.test(c)){toast("الرمز يتكون من 5 أرقام.");if($("#eLock"))$("#eLock").textContent="الرمز يتكون من 5 أرقام.";return}
-    if(f==="fLockSet"&&c!==$("#lk2").value.trim()){$("#eLock").textContent="الرمزان غير متطابقين.";return}
-    try{await S.db.doc("data/staff/meta/lock").set({hash:await sha("lock|"+c)});S.idOpen=f==="fLockChange";toast("حُفظ الرمز");render()}catch{toast("تعذّر الحفظ: تغيير الرمز للمالك فقط.")}}
-  else if(f==="fUnlock"){const c=$("#lku").value.trim();if(S.lock&&await sha("lock|"+c)===S.lock){S.idOpen=true;render()}else{$("#eUnlock").textContent="الرمز غير صحيح.";$("#lku").value=""}}
-  else if(f==="fX"){const label=$("#xl").value.trim(),max=parseFloat($("#xm").value.replace(",","."));
-    if(!label||!(max>0)){toast("اكتب اسم البند ودرجته.");return}
-    await saveSettings({extras:[...cfg().extras,{k:"x"+Date.now().toString(36),label,max}]});toast("أُضيف البند")}
-});
-async function saveSettings(patch){const c=cfg();const next={school:c.school,subject:c.subject,p1:c.p1,p2:c.p2,extras:c.extras,open:c.open,openWeeks:c.openWeeks,...patch};
-  try{await S.db.doc("settings/main").set(next)}catch{toast("تعذّر حفظ الإعدادات: لا تملك صلاحية التعديل.")}}
-async function bulkImport(){const lines=$("#bulk").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);const bad=[];const rows=[];
-  for(const l of lines){const p=l.split(/\t|,|;|،/).map(x=>x.trim());const nid=(p[0]||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d));
-    if(/^\d{10}$/.test(nid)&&p[1])rows.push({nid,name:p[1],cls:p[2]||""});else bad.push(l)}
-  if(!rows.length){$("#eBulk").textContent="لم أجد أسطرًا صالحة. الصيغة: رقم الهوية ثم الاسم.";return}
-  let ok=0;for(let i=0;i<rows.length;i+=5){await Promise.all(rows.slice(i,i+5).map(r=>S.db.doc("students/"+r.nid).set(r).then(()=>ok++).catch(()=>{})))}
-  $("#eBulk").textContent=bad.length?`تجاهلت ${bad.length} سطرًا غير صالح.`:"";if(ok)$("#bulk").value="";toast(`أُضيف ${ok} طالبًا`)}
-
-function normAr(t){return String(t||"").replace(/^\ufeff/,"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[أإآ]/g,"ا").replace(/\s+/g," ").trim().toLowerCase()}
-function parseCSV(t){t=t.replace(/^\ufeff/,"");const first=t.split(/\r?\n/)[0]||"";const cnt=c=>first.split(c).length;
-  const dl=cnt("\t")>cnt(",")&&cnt("\t")>cnt(";")?"\t":cnt(";")>cnt(",")?";":",";
-  const rows=[];let row=[],f="",q=false;
-  for(let k=0;k<t.length;k++){const c=t[k];
-    if(q){if(c==='"'){if(t[k+1]==='"'){f+='"';k++}else q=false}else f+=c}
-    else if(c==='"')q=true;else if(c===dl){row.push(f);f=""}
-    else if(c==="\n"||c==="\r"){if(c==="\r"&&t[k+1]==="\n")k++;row.push(f);f="";if(row.some(x=>x.trim()))rows.push(row);row=[]}
-    else f+=c}
-  row.push(f);if(row.some(x=>x.trim()))rows.push(row);return rows}
-function rowsFromCSV(t){const all=parseCSV(t);if(all.length<2)throw new Error("الملف فارغ أو لا يحتوي إلا صف العناوين.");
-  const h=all[0].map(normAr);const find=re=>h.findIndex(x=>re.test(x));
-  const col={name:find(/اسم|name/),id:find(/هوي|سجل|^id$/),w4:find(/(اسبوع|week) ?4|منصه ?1|منصة ?1|^w4$/),w7:find(/(اسبوع|week) ?7|منصه ?2|منصة ?2|^w7$/),w8:find(/حضوري|^w8$/),f:find(/متابع|follow/)};
-  if(col.name<0&&col.id<0)throw new Error("لم أجد عمود «اسم الطالب» في الملف.");
-  if(col.w4<0&&col.w7<0&&col.w8<0&&col.f<0)throw new Error("لم أجد أعمدة درجات معروفة في الملف.");
-  const g=(r,k)=>col[k]<0?0:Number(normAr(r[col[k]]).replace(",","."));
-  return all.slice(1).map(r=>({name:col.name<0?"":r[col.name],id:col.id<0?"":normAr(r[col.id]).replace(/\D/g,""),w4:g(r,"w4"),w7:g(r,"w7"),w8:g(r,"w8"),f:g(r,"f")}))}
-function nameKey(t){return normAr(t).replace(/[ـ\-–.]/g," ").replace(/ة/g,"ه").replace(/ى/g,"ي").replace(/\s+/g," ").trim()}
-function applyRows(rows){const er=$("#eImp");
-  const idx=new Map();for(const [nid,st] of S.students){const k=nameKey(st.name);idx.set(k,idx.has(k)?"dup":nid)}
-  let dup=0;
-  const resolve=r=>{if(r.name){const m=idx.get(nameKey(r.name));if(m==="dup"){dup++;return ""}if(m)return m}return S.students.has(String(r.id||""))?String(r.id):""};
-  const v=x=>{x=Number(x);return x>0?x:null};let n=0,miss=0;
-  for(const r of rows){const nid=resolve(r);if(!nid){if(r.name||r.id)miss++;continue}
-    const ex=[v(r.w4),v(r.w7),v(r.w8)].map((x,i)=>x==null?null:Math.min(x,EXAMS[i].m));const f=v(r.f);
-    if(ex.every(x=>x==null)&&f==null)continue;
-    editG(nid,g=>{const cur=((g.ex||{}).p1||[null,null,null]).slice();const arr=cur.map((c,i)=>ex[i]!=null?ex[i]:c);g.ex={...(g.ex||{}),p1:arr};const patch={ex:{p1:arr}};
-      if(f!=null){const t=Math.min(f,40);g.tov={...(g.tov||{}),p1:t};patch.tov={p1:t}}queue(nid,patch)});n++}
-  er.textContent=miss?`${miss} طالبًا في الملف لم تُطابَق أسماؤهم مع الطلاب المسجلين فلم تُنقل درجاتهم${dup?` (منهم ${dup} بأسماء مكررة)`:""}.`:"";
-  toast(n?`نُقلت درجات ${n} طالبًا`:"لا توجد درجات مرصودة للنقل (كل القيم أصفار).");return n}
-function importOld(){const er=$("#eImp");const t=$("#imp").value.trim();
-  if(!t){er.textContent="ارفع ملف CSV أو الصق النص أولًا.";return}
-  let rows;
-  try{if(t.startsWith("{")){const o=JSON.parse(t);rows=Array.isArray(o&&o.rows)?o.rows:[]}else rows=rowsFromCSV(t)}
-  catch(e){er.textContent=e&&e.message&&!/JSON/.test(e.message)?e.message:"النص غير صالح.";return}
-  if(!rows.length){er.textContent="لم أجد درجات في النص.";return}
-  if(applyRows(rows))$("#imp").value=""}
-async function importFile(file){const er=$("#eImp");
-  try{const buf=await file.arrayBuffer();let t=new TextDecoder("utf-8").decode(buf);
-    if(t.includes("\ufffd")){try{t=new TextDecoder("windows-1256").decode(buf)}catch{}}
-    applyRows(rowsFromCSV(t))}
-  catch(e){er.textContent=(e&&e.message)||"تعذّرت قراءة الملف."}
-  $("#impFile").value=""}
-
-boot();
+document.addEventListener("DOMContentLoaded",boot);
 </script>
-
-</body></html>
+</body>
+</html>
