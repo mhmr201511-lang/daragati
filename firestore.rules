@@ -1,0 +1,36 @@
+rules_version = '2';
+// قواعد الحماية لمنصة درجاتي: انسخها كما هي إلى Firestore > Rules
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedPw() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
+    function uname() { return request.auth.token.email.split('@')[0]; }
+    function isT() { return signedPw() && exists(/databases/$(db)/documents/data/staff/teachers/$(uname())); }
+    function noTeacherYet() { return !exists(/databases/$(db)/documents/meta/bootstrap); }
+
+    // Shows the "create first teacher" form until the first teacher exists
+    match /meta/bootstrap {
+      allow read: if true;
+      allow create: if signedPw() && noTeacherYet()
+        && existsAfter(/databases/$(db)/documents/data/staff/teachers/$(uname()));
+    }
+    match /data/staff/teachers/{u} {
+      allow read, update, delete: if isT();
+      allow create: if isT() || (signedPw() && u == uname() && noTeacherYet()
+        && existsAfter(/databases/$(db)/documents/meta/bootstrap));
+    }
+    match /data/staff/meta/{d} { allow read, write: if isT(); }
+    match /settings/{d} { allow read: if true; allow write: if isT(); }
+
+    // A student can open only their own record (by national ID); only teachers can list or edit
+    match /students/{nid} { allow get: if true; allow list, write: if isT(); }
+    match /grades/{nid}   { allow get: if true; allow list, write: if isT(); }
+
+    // Messages: each student sees only their own thread; teachers see all
+    match /inbox/{uid} {
+      allow read, write: if isT() || (request.auth != null && request.auth.uid == uid);
+      match /msgs/{m} {
+        allow read, write: if isT() || (request.auth != null && request.auth.uid == uid);
+      }
+    }
+  }
+}

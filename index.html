@@ -270,6 +270,56 @@ td.xs{color:var(--gold);font-weight:600}
 <div class="toast" id="toast" hidden></div>
 </div>
 
+<!-- Firebase: free database that stores students, grades, teacher accounts and messages -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ضع هنا إعدادات مشروعك من Firebase (Project settings > Your apps > SDK setup and configuration > Config) */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+/* Teacher usernames become Firebase logins like "ahmad@daragati.app". No real email is needed. */
+const TEACHER_DOMAIN = "daragati.app";
+
+(function(){
+  if(!FIREBASE_CONFIG.apiKey||!window.firebase)return;
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth=firebase.auth(),fs=firebase.firestore();
+  const email=u=>u+"@"+TEACHER_DOMAIN;
+  // Everyone gets a Firebase identity: teachers by password, students anonymously (needed for messages).
+  const authReady=new Promise(res=>{const off=auth.onAuthStateChanged(async u=>{off();
+    if(!u){try{await auth.signInAnonymously()}catch(e){console.warn("Anonymous sign-in is off",e)}}res()})});
+  const teacherName=()=>{const u=auth.currentUser;return u&&!u.isAnonymous&&u.email?u.email.split("@")[0]:null};
+  window.claude={
+    async use(name){await authReady;
+      if(name==="db")return fs;
+      if(name==="user")return{
+        async canEdit(){const t=teacherName();if(!t)return false;try{return (await fs.doc("data/staff/teachers/"+t).get()).exists}catch{return false}},
+        async id(){return auth.currentUser?auth.currentUser.uid:null}};
+      if(name==="downloads")return{async save({filename,data}){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"text/html;charset=utf-8"}));
+        a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}};
+      return null},
+    auth:{
+      teacher:teacherName,
+      signIn:(u,pw)=>auth.signInWithEmailAndPassword(email(u),pw),
+      async setup(u,pw,name){
+        await auth.createUserWithEmailAndPassword(email(u),pw).catch(e=>{if(e.code==="auth/email-already-in-use")return auth.signInWithEmailAndPassword(email(u),pw);throw e});
+        const b=fs.batch();b.set(fs.doc("data/staff/teachers/"+u),{name});b.set(fs.doc("meta/bootstrap"),{at:new Date().toISOString(),by:u});await b.commit()},
+      async createTeacher(u,pw){ // a second app instance so the current teacher stays signed in
+        const sec=firebase.apps.find(a=>a.name==="sec")||firebase.initializeApp(FIREBASE_CONFIG,"sec");
+        try{await sec.auth().createUserWithEmailAndPassword(email(u),pw)}finally{await sec.auth().signOut().catch(()=>{})}},
+      async changePassword(cur,next){const u=auth.currentUser;
+        await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,cur));await u.updatePassword(next)},
+      signOut:()=>auth.signOut()
+    }};
+})();
+</script>
 <script>
 document.documentElement.lang="ar";document.documentElement.dir="rtl";
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -318,7 +368,8 @@ function xsum(g,p){let s=0;for(const t of cfg().extras)s+=xval(g,p,t.k)||0;retur
 
 /* ---------- storage ---------- */
 function saveSession(){try{sessionStorage.setItem("rasd.session",JSON.stringify(S.session))}catch{}}
-function restoreSession(){try{S.session=JSON.parse(sessionStorage.getItem("rasd.session")||"null")}catch{}}
+function restoreSession(){try{S.session=JSON.parse(sessionStorage.getItem("rasd.session")||"null");const t=sessionStorage.getItem("rasd.tab");if(t){S.tab=t;sessionStorage.removeItem("rasd.tab")}}catch{}}
+function reloadTo(tab){try{sessionStorage.setItem("rasd.tab",tab)}catch{}location.reload()}
 const toEn=t=>String(t||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d));
 async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3200)}
@@ -333,7 +384,7 @@ function pump(){for(const nid of [...dirty.keys()]){if(inflight.size>=5)break;if
 async function write(nid,patch,retry){const ref=S.db.doc("grades/"+nid);
   try{if(S.remote.has(nid))await ref.update(patch);else{await ref.set({...JSON.parse(JSON.stringify(G(nid))),nid});S.remote.add(nid)}}
   catch(e){if(e&&e.code==="unavailable"&&!retry){await new Promise(r=>setTimeout(r,600+Math.random()*600));return write(nid,patch,true)}
-    setSync("err");toast(e&&e.code==="invalid_argument"?"لم يُحفظ الرصد: حسابك على المنصة لا يملك صلاحية رصد الدرجات. اطلب من المالك منحك صلاحية «محرر».":"تعذّر حفظ الدرجات، حاول مرة أخرى.")}}
+    setSync("err");toast(e&&(e.code==="invalid_argument"||e.code==="permission-denied")?"لم يُحفظ الرصد: لا تملك صلاحية رصد الدرجات.":"تعذّر حفظ الدرجات، حاول مرة أخرى.")}}
 function editG(nid,fn){const g=JSON.parse(JSON.stringify(G(nid)));fn(g);S.grades.set(nid,g)}
 function setCell(nid,k,a,i,v){
   if(k==="w")editG(nid,g=>{g.w=g.w||{};const arr=(g.w[a]||Array(10).fill(null)).slice();while(arr.length<10)arr.push(null);arr[i]=v;g.w[a]=arr;queue(nid,{w:{[a]:arr}})});
@@ -353,20 +404,26 @@ async function boot(){
   try{S.uid=user?await user.id():null}catch{}
   const fail=()=>{};
   db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():null;$("#school").textContent=cfg().school+(cfg().subject?" · "+cfg().subject:"");render()},fail);
-  db.collection("students").onSnapshot(q=>{S.students=new Map(q.docs.map(d=>[d.id,d.data()]));S.loaded=true;render()},fail);
-  db.collection("grades").onSnapshot(q=>{S.remote=new Set(q.docs.map(d=>d.id));
-    for(const d of q.docs){if(!dirty.has(d.id)&&!inflight.has(d.id))S.grades.set(d.id,d.data())}
-    for(const id of [...S.grades.keys()])if(!S.remote.has(id)&&!dirty.has(id)&&!inflight.has(id))S.grades.delete(id);
-    if(S.session&&S.session.role==="t"&&["weekly","exams","extras","summary","final"].includes(S.tab))refreshValues();else render()},fail);
-  db.doc("data/staff/meta/lock").onSnapshot(s=>{S.lock=s.exists?s.data().hash:null;S.lockLoaded=true;if(S.tab==="ids")render()},fail);
+  db.doc("meta/bootstrap").onSnapshot(s=>{S.teachersEmpty=!s.exists;if(!S.session)render()},fail);
+  if(S.session&&S.session.role==="t"&&!S.canEdit){S.session=null;saveSession()}
   if(S.canEdit){
-    db.collection("data/staff/teachers").onSnapshot(q=>{S.teachers=q.docs.map(d=>({u:d.id,...d.data()}));S.teachersEmpty=q.empty;
-      if(!S.session||S.tab==="settings")render()},fail);
+    db.collection("students").onSnapshot(q=>{S.students=new Map(q.docs.map(d=>[d.id,d.data()]));S.loaded=true;render()},fail);
+    db.collection("grades").onSnapshot(q=>{S.remote=new Set(q.docs.map(d=>d.id));
+      for(const d of q.docs){if(!dirty.has(d.id)&&!inflight.has(d.id))S.grades.set(d.id,d.data())}
+      for(const id of [...S.grades.keys()])if(!S.remote.has(id)&&!dirty.has(id)&&!inflight.has(id))S.grades.delete(id);
+      if(S.session&&S.session.role==="t"&&["weekly","exams","extras","summary","final"].includes(S.tab))refreshValues();else render()},fail);
+    db.doc("data/staff/meta/lock").onSnapshot(s=>{S.lock=s.exists?s.data().hash:null;S.lockLoaded=true;if(S.tab==="ids")render()},fail);
+    db.collection("data/staff/teachers").onSnapshot(q=>{S.teachers=q.docs.map(d=>({u:d.id,...d.data()}));if(S.tab==="settings")render()},fail);
   }
+  if(S.session&&S.session.role==="s")watchStudent(S.session.id);
   if(S.session&&S.session.role==="s")startStudentInbox();
   if(S.session&&S.session.role==="t")startTeacherInbox();
   render();
 }
+
+function watchStudent(nid){if(S.watching===nid)return;S.watching=nid;
+  S.db.doc("students/"+nid).onSnapshot(s=>{S.students=new Map(s.exists?[[nid,s.data()]]:[]);S.loaded=true;render()},()=>{S.loaded=true;render()});
+  S.db.doc("grades/"+nid).onSnapshot(s=>{if(s.exists)S.grades.set(nid,s.data());else S.grades.delete(nid);render()},()=>{})}
 
 /* ---------- messages ---------- */
 const fmtTime=t=>{try{return new Date(t).toLocaleString("ar-SA-u-nu-latn",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}catch{return ""}};
@@ -424,7 +481,7 @@ async function sendMsg(){if(S.sending)return;const text=($("#mText")?.value||"")
     await S.db.collection("inbox/"+uid+"/msgs").add({from:me,nid,text,file:f,at,by:me==="t"?S.session.name:""});
     await S.db.doc("inbox/"+uid).update({lastAt:at,lastFrom:me,lastText:(text||("مرفق: "+file.name)).slice(0,80),[me==="t"?"tSeen":"sSeen"]:at}).catch(()=>{});
     S.draft="";if($("#mText"))$("#mText").value="";S.pfile=null;renderFileChip()}
-  catch(e){toast(e&&e.message&&e.message[0]==="!"?e.message.slice(1):"تعذّر إرسال الرسالة. تأكد أن حسابك على المنصة يملك صلاحية «مساهم».")}
+  catch(e){toast(e&&e.message&&e.message[0]==="!"?e.message.slice(1):"تعذّر إرسال الرسالة. حاول مرة أخرى.")}
   S.sending=false;if(btn){btn.disabled=false;btn.textContent="إرسال"}}
 function messagesTab(){if(S.thread&&!S.inbox.has(S.thread))S.thread=null;
   const t=S.thread&&S.inbox.get(S.thread);
@@ -435,7 +492,7 @@ function studentMsgCard(){const th=S.myThread;const unread=!!(th&&th.lastFrom===
   const icon=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>`;
   if(!S.msgOpen)return `<button class="msgtile" data-act="msgopen"><span class="mi">${icon}</span><span class="mt"><b>الرسائل مع المعلم</b><small>${unread?"لديك رسالة جديدة من معلمك":"اضغط لكتابة رسالة أو إرسال ملف لمعلمك"}</small></span>${unread?`<span class="newdot">جديد</span>`:""}<span class="chev" aria-hidden="true">‹</span></button>`;
   const head=`<div class="mh"><h3>الرسائل مع المعلم</h3><button class="btn sm" data-act="msgclose">إغلاق</button></div>`;
-  if(S.msgOk===false)return `<div class="card msgbox">${head}<p class="muted" style="margin:6px 0 0">${S.msgWhy==="signin"?"سجّل الدخول إلى حسابك في Claude لتتمكن من مراسلة معلمك.":"لا يملك حسابك صلاحية المراسلة بعد. اطلب من معلمك منحك صلاحية «مساهم» على المنصة."}</p></div>`;
+  if(S.msgOk===false)return `<div class="card msgbox">${head}<p class="muted" style="margin:6px 0 0">${S.msgWhy==="signin"?"تعذّر تفعيل المراسلة. أعد تحميل الصفحة.":"تعذّر تفعيل المراسلة حاليًا. أعد تحميل الصفحة أو راجع معلمك."}</p></div>`;
   return `<div class="card convo msgbox">${head}<div class="msglist" id="msgList"></div>${composerHTML()}</div>`}
 
 /* ---------- header ---------- */
@@ -461,9 +518,9 @@ function render(){renderWho();const v=$("#view");const s=S.session;
   renderFileChip();freezeNames()}
 
 function loginView(){
-  if(S.noDb)return `<div class="card login"><h2>المنصة تحتاج تسجيل الدخول</h2><p class="muted">افتح هذه الصفحة وأنت مسجّل الدخول إلى حسابك في Claude حتى تظهر بيانات الطلاب والدرجات.</p></div>`;
+  if(S.noDb)return `<div class="card login"><h2>قاعدة البيانات غير مربوطة</h2><p class="muted">لم تُضبط إعدادات Firebase في الملف بعد، أو تعذّر الاتصال بالإنترنت. أعد تحميل الصفحة، وإن استمرت المشكلة راجع مالك المنصة.</p></div>`;
   const m=S.loginMode;
-  const setup=m==="t"&&S.canEdit&&S.teachersEmpty;
+  const setup=m==="t"&&S.teachersEmpty;
   return `<div class="login">
   <div class="card stack">
     <div><h2>الدخول إلى درجاتي</h2><p class="muted" style="margin:0">الطالب يدخل برقم الهوية، والمعلم باسم المستخدم وكلمة المرور.</p></div>
@@ -471,11 +528,8 @@ function loginView(){
     ${m==="s"?`<form class="stack" id="fS">
       <div class="field"><label for="nid">رقم الهوية</label><input class="input" id="nid" inputmode="numeric" autocomplete="off" placeholder="10 أرقام" maxlength="10"></div>
       <div class="err" id="eS"></div><button class="btn primary" type="submit">عرض درجاتي</button></form>`
-    :m==="r"?`<form class="stack" id="fReset" autocomplete="off"><p class="hint" style="margin:0">تعذّر الدخول ثلاث مرات. للتحقق أدخل رقم هويتك، ثم اختر كلمة مرور جديدة.</p>
-      <div class="field"><label for="ru">رقم الهوية</label><input class="input" id="ru" dir="ltr" inputmode="numeric" maxlength="10" autocomplete="off"></div>
-      <div class="field"><label for="rp">كلمة المرور الجديدة</label><input class="input" id="rp" type="password" dir="ltr" autocomplete="new-password"></div>
-      <div class="field"><label for="rp2">تأكيد كلمة المرور</label><input class="input" id="rp2" type="password" dir="ltr" autocomplete="new-password"></div>
-      <div class="err" id="eR"></div><button class="btn primary" type="submit">حفظ والدخول</button><button type="button" class="btn sm" data-act="mode" data-m="t" style="justify-self:start">رجوع لتسجيل الدخول</button></form>`
+    :m==="r"?`<div class="stack"><p class="hint" style="margin:0">تعذّر الدخول ثلاث مرات. إذا نسيت كلمة المرور اطلب من معلم آخر حذف حسابك وإضافته من جديد، أو اطلب من مالك المنصة إعادة تعيينها من لوحة Firebase.</p>
+      <button type="button" class="btn sm" data-act="mode" data-m="t" style="justify-self:start">رجوع لتسجيل الدخول</button></div>`
     :setup?`<form class="stack" id="fSetup"><p class="hint" style="margin:0">لا يوجد حساب معلم بعد. أنشئ الحساب الأول، ويمكنك إضافة بقية المعلمين لاحقًا من الإعدادات.</p>
       <div class="field"><label for="su_n">اسم المعلم</label><input class="input" id="su_n" required></div>
       <div class="field"><label for="su_u">اسم المستخدم (أحرف إنجليزية أو أرقام)</label><input class="input" id="su_u" dir="ltr" required></div>
@@ -648,7 +702,7 @@ function settingsTab(){const c=cfg();
   <form class="stack" id="fTeach"><div class="field"><label for="t_n">اسم المعلم</label><input class="input" id="t_n" required></div>
   <div class="row3"><div class="field"><label for="t_u">اسم المستخدم</label><input class="input" id="t_u" dir="ltr" required></div><div class="field"><label for="t_p">كلمة المرور</label><input class="input" id="t_p" dir="ltr" required minlength="6"></div></div>
   <div class="err" id="eTeach"></div><button class="btn primary" type="submit">إضافة معلم</button></form>`
-  :`<p class="muted">إضافة المعلمين وحذفهم متاحة لمالك المنصة فقط.</p>`}</div>
+  :`<p class="muted">إضافة المعلمين وحذفهم متاحة للمعلمين فقط.</p>`}</div>
   <div class="card stack"><h3>نقل الدرجات من بوابة التعلم</h3><p class="hint" style="margin:0">في بوابة التعلم افتح تبويب «الدرجات» واضغط «تصدير الدرجات ملف CSV»، ثم ارفع الملف هنا، أو الصق النص المنسوخ في الخانة. تُنقل اختبارات الأسبوع 4 و7 والحضوري إلى تقييمات الفترة الأولى، ودرجة المتابعة (من 40) إلى مهام الفترة الأولى. تُتجاهل القيم الصفرية.</p>
     <div class="field"><label for="impFile">ملف CSV</label><input class="input" id="impFile" type="file" accept=".csv,text/csv"></div>
     <p class="hint" style="margin:0">تُطابَق الدرجات باسم الطالب. الأعمدة المقبولة: الاسم، اختبار الأسبوع 4، اختبار الأسبوع 7، الاختبار الحضوري، المتابعة. ترتيب الأعمدة لا يهم.</p>
@@ -749,7 +803,7 @@ document.addEventListener("click",async e=>{const b=e.target.closest("[data-act]
   if(!$("#pop").hidden&&!e.target.closest("#pop")&&!(b&&["fill","fillweek","ded"].includes(b.dataset.act)))closePop();
   if(!b)return;const a=b.dataset.act;
   if(a==="mode"){S.loginMode=b.dataset.m;render()}
-  else if(a==="logout"){S.session=null;S.msgOpen=false;S.stWeek=null;S.idOpen=false;if(S.unsubMsgs){S.unsubMsgs();S.unsubMsgs=null}S.msgs=[];S.msgsFor=null;S.thread=null;S.stInbox=false;S.msgOk=undefined;saveSession();render()}
+  else if(a==="logout"){S.session=null;S.msgOpen=false;S.stWeek=null;S.idOpen=false;if(S.unsubMsgs){S.unsubMsgs();S.unsubMsgs=null}S.msgs=[];S.msgsFor=null;S.thread=null;S.stInbox=false;S.msgOk=undefined;saveSession();Promise.resolve(window.claude&&claude.auth&&claude.auth.teacher()?claude.auth.signOut():0).finally(()=>location.reload())}
   else if(a==="tab"){if(b.dataset.t!=="ids")S.idOpen=false;S.tab=b.dataset.t;render()}
   else if(a==="period"){S.period=b.dataset.p;render()}
   else if(a==="week"){S.week=+b.dataset.w;render()}
@@ -806,45 +860,41 @@ document.addEventListener("submit",async e=>{e.preventDefault();const f=e.target
     if(!/^\d{10}$/.test(nid)){$("#eS").textContent="رقم الهوية يتكون من 10 أرقام.";return}
     const s=await S.db.doc("students/"+nid).get().catch(()=>null);
     if(!s||!s.exists){$("#eS").textContent="رقم الهوية غير مسجّل. تأكد منه أو راجع معلمك.";return}
-    S.session={role:"s",id:nid};saveSession();S.stInbox=false;render();startStudentInbox()}
+    S.session={role:"s",id:nid};saveSession();S.stInbox=false;watchStudent(nid);render();startStudentInbox()}
   else if(f==="fT"){const u=toEn($("#tu").value.trim().toLowerCase()),pwRaw=$("#tp").value,er=$("#eT");
     if(!/^[a-z0-9_.-]{3,32}$/.test(u)||!pwRaw){er.textContent=u&&!/^[a-z0-9_.-]+$/.test(u)?"اسم المستخدم يُكتب بأحرف إنجليزية أو أرقام فقط.":"اكتب اسم المستخدم وكلمة المرور.";return}
     if(!S.db){er.textContent="المنصة لم تتصل بالبيانات بعد. أعد تحميل الصفحة.";return}
-    const s=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);
     const fail=()=>{S.fails=(S.fails||0)+1;if(S.fails>=3){S.fails=0;S.loginMode="r";render();return true}return false};
-    if(!s||!s.exists){if(fail())return;er.textContent=S.canEdit?"اسم المستخدم غير موجود.":"تعذّر الدخول: حسابك في Claude لا يملك صلاحية «محرر» على هذه المنصة. افتحها من حساب المالك، أو اطلب من المالك منحك صلاحية «محرر».";return}
-    const h=s.data().hash,cands=[...new Set([pwRaw,toEn(pwRaw),pwRaw.trim(),toEn(pwRaw.trim())])];let ok=false;
-    for(const c of cands){if(await sha(u+"|"+c)===h){ok=true;break}}
-    if(!ok){if(fail())return;er.textContent=`كلمة المرور غير صحيحة. المحاولات المتبقية: ${3-S.fails}.`;return}
-    S.fails=0;
-    S.session={role:"t",id:u,name:s.data().name};saveSession();S.tab="weekly";startTeacherInbox();render()}
+    let ok=false,why="";for(const c of [...new Set([pwRaw,toEn(pwRaw),pwRaw.trim(),toEn(pwRaw.trim())])]){
+      try{await claude.auth.signIn(u,c);ok=true;break}catch(e){why=e&&e.code||"";if(why==="auth/too-many-requests"||why==="auth/network-request-failed")break}}
+    if(!ok){if(why==="auth/network-request-failed"){er.textContent="تعذّر الاتصال. تحقق من الإنترنت.";return}
+      if(why==="auth/too-many-requests"){er.textContent="محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.";return}
+      if(fail())return;er.textContent=`اسم المستخدم أو كلمة المرور غير صحيحة. المحاولات المتبقية: ${3-S.fails}.`;return}
+    const snap=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);
+    if(!snap||!snap.exists){await claude.auth.signOut();er.textContent="هذا الحساب لم يعد ضمن معلمي المنصة.";return}
+    S.fails=0;S.session={role:"t",id:u,name:snap.data().name};saveSession();reloadTo("weekly")}
   else if(f==="fSetup"||f==="fTeach"){const P=f==="fSetup"?"su_":"t_";const n=$("#"+P+"n").value.trim(),u=toEn($("#"+P+"u").value.trim().toLowerCase()),pw=toEn($("#"+P+"p").value.trim());const er=$("#e"+(f==="fSetup"?"Setup":"Teach"));
     if(!/^[a-z0-9_.-]{3,32}$/.test(u)){er.textContent="اسم المستخدم: من 3 إلى 32 حرفًا إنجليزيًا أو رقمًا.";return}
     if(pw.length<6){er.textContent="كلمة المرور 6 أحرف على الأقل.";return}
     if((S.teachers||[]).some(t=>t.u===u)){er.textContent="اسم المستخدم مستخدم من قبل.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:n,hash:await sha(u+"|"+pw)})}catch{er.textContent="تعذّر الحفظ: إدارة الحسابات للمالك فقط.";return}
-    if(f==="fSetup"){S.session={role:"t",id:u,name:n};saveSession();S.tab="students";startTeacherInbox();render()}else{e.target.reset();toast("أُضيف المعلم")}}
+    if(f==="fSetup"){try{await claude.auth.setup(u,pw,n)}catch(x){er.textContent=x&&x.code==="auth/wrong-password"||x&&x.code==="auth/invalid-credential"?"اسم المستخدم مستخدم من قبل بكلمة مرور أخرى.":"تعذّر إنشاء الحساب. تأكد من تفعيل الدخول بالبريد وكلمة المرور في Firebase.";return}
+      S.session={role:"t",id:u,name:n};saveSession();reloadTo("students");return}
+    try{await S.db.doc("data/staff/teachers/"+u).set({name:n})}catch{er.textContent="تعذّر الحفظ: لا تملك صلاحية إدارة الحسابات.";return}
+    try{await claude.auth.createTeacher(u,pw)}catch(x){if(!(x&&x.code==="auth/email-already-in-use")){er.textContent="أُضيف المعلم للقائمة لكن تعذّر إنشاء كلمة المرور. احذفه وأعد المحاولة.";return}
+      toast("اسم المستخدم كان مسجّلًا من قبل، فيدخل المعلم بكلمة مروره السابقة.")}
+    e.target.reset();toast("أُضيف المعلم")}
   else if(f==="fAdd"){const nid=$("#a_nid").value.trim(),name=$("#a_name").value.trim(),cls=$("#a_cls").value.trim();
     if(!/^\d{10}$/.test(nid)){toast("رقم الهوية يتكون من 10 أرقام.");return}
     try{await S.db.doc("students/"+nid).set({nid,name,cls});e.target.reset();$("#a_nid").focus();toast("أُضيف "+name)}catch{toast("تعذّر الحفظ: لا تملك صلاحية التعديل.")}}
   else if(f==="fSet"){const p1={from:+$("#p1f").value,to:+$("#p1t").value},p2={from:+$("#p2f").value,to:+$("#p2t").value};
     if(![p1,p2].every(p=>p.from>=1&&p.to>=p.from&&p.to<=60)){$("#eSet").textContent="تحقق من أرقام الأسابيع.";return}
     await saveSettings({school:$("#s_school").value.trim()||DEF.school,subject:$("#s_subject").value.trim(),p1,p2});toast("حُفظت الإعدادات")}
-  else if(f==="fReset"){const u=toEn($("#ru").value.trim()),pw=toEn($("#rp").value.trim()),er=$("#eR");
-    if(!/^\d{10}$/.test(u)){er.textContent="رقم الهوية يتكون من 10 أرقام.";return}
-    const snap=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);const t=snap&&snap.exists?{name:snap.data().name}:null;
-    if(!t){er.textContent="رقم الهوية لا يطابق أي حساب معلم.";return}
-    if(pw.length<6){er.textContent="كلمة المرور 6 أحرف على الأقل.";return}
-    if(pw!==toEn($("#rp2").value.trim())){er.textContent="كلمتا المرور غير متطابقتين.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:t.name,hash:await sha(u+"|"+pw)})}catch{er.textContent="تعذّر الحفظ: حسابك في Claude لا يملك صلاحية «محرر» على المنصة.";return}
-    S.session={role:"t",id:u,name:t.name};saveSession();S.tab="weekly";S.loginMode="t";startTeacherInbox();render();toast("حُفظت كلمة المرور الجديدة")}
-  else if(f==="fMyPw"){const u=S.session.id,er=$("#eMy");const cur=$("#mp0").value,n1=toEn($("#mp1").value.trim()),n2=toEn($("#mp2").value.trim());
-    const snap=await S.db.doc("data/staff/teachers/"+u).get().catch(()=>null);if(!snap||!snap.exists){er.textContent="تعذّر قراءة حسابك.";return}
-    let ok=false;for(const c of new Set([cur,toEn(cur),cur.trim(),toEn(cur.trim())]))if(await sha(u+"|"+c)===snap.data().hash){ok=true;break}
-    if(!ok){er.textContent="كلمة المرور الحالية غير صحيحة.";return}
+  else if(f==="fMyPw"){const er=$("#eMy");const cur=$("#mp0").value,n1=toEn($("#mp1").value.trim()),n2=toEn($("#mp2").value.trim());
     if(n1.length<6){er.textContent="كلمة المرور الجديدة 6 أحرف على الأقل.";return}
     if(n1!==n2){er.textContent="كلمتا المرور غير متطابقتين.";return}
-    try{await S.db.doc("data/staff/teachers/"+u).set({name:snap.data().name,hash:await sha(u+"|"+n1)});e.target.reset();er.textContent="";toast("تم تغيير كلمة المرور")}catch{er.textContent="تعذّر الحفظ.";}}
+    let ok=false;for(const c of new Set([cur,toEn(cur),cur.trim(),toEn(cur.trim())])){try{await claude.auth.changePassword(c,n1);ok=true;break}catch(x){if(x&&x.code==="auth/too-many-requests")break}}
+    if(!ok){er.textContent="كلمة المرور الحالية غير صحيحة.";return}
+    e.target.reset();er.textContent="";toast("تم تغيير كلمة المرور")}
   else if(f==="fLockSet"||f==="fLockChange"){const c=f==="fLockSet"?$("#lk1").value.trim():$("#lkn").value.trim();
     if(!/^\d{5}$/.test(c)){toast("الرمز يتكون من 5 أرقام.");if($("#eLock"))$("#eLock").textContent="الرمز يتكون من 5 أرقام.";return}
     if(f==="fLockSet"&&c!==$("#lk2").value.trim()){$("#eLock").textContent="الرمزان غير متطابقين.";return}
